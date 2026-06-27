@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+class WebServer;
+
 // Reads raw RGB565 (big-endian) image files from the microSD card and blits
 // them to the LCD. Files must be sized to the screen (landscape: 320x172) with
 // no header. Convert on a PC, e.g.:
@@ -11,5 +13,6 @@
 extern bool SDIMG_init(void);
 extern String SDIMG_list(void);            // image file names joined with '|'
 extern bool SDIMG_show(String name);       // draw the named file full screen
+extern bool SDIMG_sendRaw(String name, WebServer* server);  // stream raw bytes to HTTP client
 
 #endif

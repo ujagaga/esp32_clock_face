@@ -1,5 +1,6 @@
 #include <SD.h>
 #include <SPI.h>
+#include <WebServer.h>
 #include "config.h"
 #include "lcd_display.h"
 #include "sd_images.h"
@@ -78,5 +79,39 @@ bool SDIMG_show(String name){
   f.close();
   LCD_imageEnd();
 
+  return true;
+}
+
+// Stream a raw RGB565 file to an HTTP client as application/octet-stream using
+// chunked transfer. The browser decodes the bytes into a canvas.
+bool SDIMG_sendRaw(String name, WebServer* server){
+  if(!cardReady){
+    return false;
+  }
+
+  String path = name.startsWith("/") ? name : ("/" + name);
+
+  LCD_busRelease();
+  File f = SD.open(path);
+  LCD_busAcquire();
+  if(!f){
+    return false;
+  }
+
+  server->setContentLength(f.size());
+  server->send(200, "application/octet-stream", "");
+
+  static uint8_t buf[512];
+  while(true){
+    LCD_busRelease();
+    int got = f.read(buf, sizeof(buf));
+    LCD_busAcquire();
+    if(got <= 0){
+      break;
+    }
+    server->sendContent((const char*)buf, got);
+  }
+
+  f.close();
   return true;
 }

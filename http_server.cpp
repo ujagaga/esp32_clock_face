@@ -56,9 +56,42 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
   <br/>
   <hr>
+  <p id="pvlabel" style="display:none;">Preview:</p>
+  <canvas id="pv" width="320" height="172" style="display:none;max-width:100%;border:1px solid #ccc;"></canvas>
+  <hr>
   <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a>
 </div>
 <script>
+  var PV_W=320, PV_H=172;
+  function onSel(v){
+    fetch('/setdisplay?img=' + encodeURIComponent(v));
+    var cv=document.getElementById('pv'), lb=document.getElementById('pvlabel');
+    if(v==='clock'){
+      cv.style.display='none'; lb.style.display='none';
+      return;
+    }
+    fetch('/getimage?name=' + encodeURIComponent(v)).then(function(r){
+      if(!r.ok){ throw new Error('not found'); }
+      return r.arrayBuffer();
+    }).then(function(ab){
+      var bytes=new Uint8Array(ab);
+      var img=cv.getContext('2d').createImageData(PV_W, PV_H);
+      var d=img.data, n=PV_W*PV_H;
+      for(var i=0;i<n;i++){
+        var hi=bytes[2*i], lo=bytes[2*i+1];      // big-endian RGB565
+        var p=(hi<<8)|lo;
+        var r5=(p>>11)&0x1f, g6=(p>>5)&0x3f, b5=p&0x1f;
+        d[4*i]  =(r5*255/31)|0;
+        d[4*i+1]=(g6*255/63)|0;
+        d[4*i+2]=(b5*255/31)|0;
+        d[4*i+3]=255;
+      }
+      cv.getContext('2d').putImageData(img,0,0);
+      cv.style.display='block'; lb.style.display='block';
+    }).catch(function(){
+      cv.style.display='none'; lb.style.display='none';
+    });
+  }
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/setbl?v=' + v); }
   setInterval(function(){
@@ -160,7 +193,7 @@ void showStartPage() {
 
   // Display selector: clock or one of the SD card images.
   response += "<label for='disp'>Display: </label>";
-  response += "<select id='disp' onchange=\"fetch('/setdisplay?img=' + encodeURIComponent(this.value));\">";
+  response += "<select id='disp' onchange=\"onSel(this.value);\">";
   response += "<option value='clock'>Clock</option>";
   String imgList = SDIMG_list();
   int start = 0;
@@ -293,6 +326,13 @@ static void imageList(void){
   webServer->send(200, "text/plain", SDIMG_list());
 }
 
+static void getImage(void){
+  String name = webServer->arg("name");
+  if(name.length() == 0 || !SDIMG_sendRaw(name, webServer)){
+    webServer->send(404, "text/plain", "Image not found");
+  }
+}
+
 static void apList(void){
   webServer->send(200, "text/plain", WIFIC_getApList());
 }
@@ -319,6 +359,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/flashbl", HTTP_GET, flashBacklight);
   webServer->on("/getdisplay", HTTP_GET, getDisplay);
   webServer->on("/imagelist", HTTP_GET, imageList);
+  webServer->on("/getimage", HTTP_GET, getImage);
   webServer->on("/aplist", HTTP_GET, apList);
   webServer->onNotFound(showStartPage);
   
