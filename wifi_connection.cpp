@@ -1,0 +1,180 @@
+/*
+ *  Author: Rada Berar
+ *  Email: ujagaga@gmail.com
+ *
+ *  Simplified WiFi connection module for ESP32:
+ *  - AP always on
+ *  - STA connects if saved
+ *  - Automatic reconnection handled by ESP32 core
+ *  - EEPROM stores SSID and password
+ */
+
+#include <WiFi.h>
+#include <EEPROM.h>
+#include "config.h"
+#include "NTPSync.h"
+
+// -----------------------------------------------------------------------------
+// Local variables
+// -----------------------------------------------------------------------------
+static char myApName[32] = {0};         // AP name
+static char st_ssid[SSID_SIZE] = {0};   // Saved SSID
+static char st_pass[WIFI_PASS_SIZE] = {0}; // Saved password
+static IPAddress stationIP;
+static IPAddress apIP(192, 168, 4, 1);
+static bool stationConnectedOnce = false; // mark first successful STA connect
+
+// -----------------------------------------------------------------------------
+// Getters
+// -----------------------------------------------------------------------------
+char* WIFIC_getDeviceName(void) {
+    return myApName;
+}
+
+String WIFIC_getApIp(void) {
+    return apIP.toString();
+}
+
+String WIFIC_getStSSID(void) {
+    return String(st_ssid);
+}
+
+String WIFIC_getStPass(void) {
+    return String(st_pass);
+}
+
+// -----------------------------------------------------------------------------
+// EEPROM helpers
+// -----------------------------------------------------------------------------
+void WIFIC_setStSSID(String new_ssid) {
+    EEPROM.begin(EEPROM_SIZE);
+    uint16_t addr = 0;
+    for (; addr < new_ssid.length() && addr < SSID_SIZE - 1; addr++) {
+        EEPROM.put(addr + SSID_EEPROM_ADDR, new_ssid[addr]);
+        st_ssid[addr] = new_ssid[addr];
+    }
+    EEPROM.put(addr + SSID_EEPROM_ADDR, 0);
+    st_ssid[addr] = 0;
+    EEPROM.commit();
+}
+
+void WIFIC_setStPass(String new_pass) {
+    EEPROM.begin(EEPROM_SIZE);
+    uint16_t addr = 0;
+    for (; addr < new_pass.length() && addr < WIFI_PASS_SIZE - 1; addr++) {
+        EEPROM.put(addr + WIFI_PASS_EEPROM_ADDR, new_pass[addr]);
+        st_pass[addr] = new_pass[addr];
+    }
+    EEPROM.put(addr + WIFI_PASS_EEPROM_ADDR, 0);
+    st_pass[addr] = 0;
+    EEPROM.commit();
+}
+
+// -----------------------------------------------------------------------------
+// Wi-Fi AP mode
+// -----------------------------------------------------------------------------
+static void APMode(void) {
+    Serial.println("\nStarting AP");
+
+    WiFi.mode(WIFI_AP_STA);          // Ensure AP+STA mode
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+
+    String apName = String(AP_NAME_PREFIX) + WiFi.macAddress();
+    apName.toCharArray(myApName, 16);
+
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    WiFi.softAP(myApName, AP_PASS);
+
+    Serial.printf("AP active: %s, IP: %s\n", myApName, apIP.toString().c_str());
+}
+
+// -----------------------------------------------------------------------------
+// Wi-Fi STA mode
+// -----------------------------------------------------------------------------
+void WIFIC_stationMode(void) {
+    if (st_ssid[0] == 0) {
+        Serial.println("No saved WiFi credentials.");
+        return;
+    }
+
+    Serial.printf("Connecting STA [%s]...\n", st_ssid);
+    WiFi.begin(st_ssid, st_pass);
+}
+
+// -----------------------------------------------------------------------------
+// Wi-Fi event callbacks
+// -----------------------------------------------------------------------------
+void WIFIC_setupCallbacks(void) {
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+        stationIP = WiFi.localIP();
+        Serial.printf("\n\nConnected, IP: %s\n", stationIP.toString().c_str());
+
+        if (!stationConnectedOnce) {
+            stationConnectedOnce = true;
+        }
+    }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+        Serial.println("STA disconnected, will auto-reconnect.");
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+}
+
+// -----------------------------------------------------------------------------
+// Initialize Wi-Fi module
+// -----------------------------------------------------------------------------
+void WIFIC_init(void) {
+    EEPROM.begin(EEPROM_SIZE);
+
+    // Load saved password
+    uint16_t i = 0;
+    do {
+        EEPROM.get(i + WIFI_PASS_EEPROM_ADDR, st_pass[i]);
+        if ((st_pass[i] < 32) || (st_pass[i] > 126)) break;
+        i++;
+    } while (i < WIFI_PASS_SIZE);
+    st_pass[i] = 0;
+
+    // Load saved SSID
+    i = 0;
+    do {
+        EEPROM.get(i + SSID_EEPROM_ADDR, st_ssid[i]);
+        if ((st_ssid[i] < 32) || (st_ssid[i] > 126)) break;
+        i++;
+    } while (i < SSID_SIZE);
+    st_ssid[i] = 0;
+
+    // Setup AP and STA
+    APMode();
+    WIFIC_setupCallbacks();
+    WIFIC_stationMode();
+}
+
+// -----------------------------------------------------------------------------
+// Return list of scanned APs
+// -----------------------------------------------------------------------------
+String WIFIC_getApList(void) {
+    String result = "";
+    int n = WiFi.scanNetworks();
+    if (n > 0) {
+        result = WiFi.SSID(0);
+        for (int i = 1; i < n; ++i) {
+            result += "|" + WiFi.SSID(i);
+        }
+    }
+    return result;
+}
+
+String WIFIC_getStationIp()
+{
+    if (WiFi.status() == WL_CONNECTED){
+        return WiFi.localIP().toString();
+    }
+    return "";
+}
+
+bool WIFIC_stationConnected()
+{
+    return (WiFi.status() == WL_CONNECTED);
+}
+
