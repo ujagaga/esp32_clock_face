@@ -56,48 +56,79 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
   <br/>
   <hr>
-  <p id="pvlabel" style="display:none;">Preview:</p>
-  <canvas id="pv" width="320" height="172" style="display:none;max-width:100%;border:1px solid #ccc;"></canvas>
+  <p>Gallery (click to display):</p>
+  <div id="gal"></div>
   <hr>
   <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a>
 </div>
+<style>
+  #gal{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  #gal figure{margin:0;cursor:pointer;text-align:center;}
+  #gal canvas{width:160px;height:auto;border:2px solid #ccc;border-radius:4px;display:block;}
+  #gal figure.sel canvas{border-color:#ff3300;}
+  #gal figcaption{font-size:0.7rem;word-break:break-all;width:160px;}
+</style>
 <script>
   var PV_W=320, PV_H=172;
-  function onSel(v){
-    fetch('/setdisplay?img=' + encodeURIComponent(v));
-    var cv=document.getElementById('pv'), lb=document.getElementById('pvlabel');
-    if(v==='clock'){
-      cv.style.display='none'; lb.style.display='none';
-      return;
+  function selectImg(name){ fetch('/setdisplay?img=' + encodeURIComponent(name)); markSel(name); }
+  function markSel(name){
+    var figs=document.querySelectorAll('#gal figure');
+    for(var i=0;i<figs.length;i++){
+      figs[i].className = (figs[i].dataset.name===name) ? 'sel' : '';
     }
-    fetch('/getimage?name=' + encodeURIComponent(v)).then(function(r){
+  }
+  function onSel(v){ fetch('/setdisplay?img=' + encodeURIComponent(v)); markSel(v); }
+  function decode(ab, cv){
+    var bytes=new Uint8Array(ab);
+    var ctx=cv.getContext('2d');
+    var img=ctx.createImageData(PV_W, PV_H);
+    var d=img.data, n=PV_W*PV_H;
+    for(var i=0;i<n;i++){
+      var p=(bytes[2*i]<<8)|bytes[2*i+1];      // big-endian RGB565
+      var r5=(p>>11)&0x1f, g6=(p>>5)&0x3f, b5=p&0x1f;
+      d[4*i]  =(r5*255/31)|0;
+      d[4*i+1]=(g6*255/63)|0;
+      d[4*i+2]=(b5*255/31)|0;
+      d[4*i+3]=255;
+    }
+    ctx.putImageData(img,0,0);
+  }
+  // Fetch and render images one at a time so the ESP32 streams a single file at once.
+  function loadOne(names, idx){
+    if(idx>=names.length){ return; }
+    var name=names[idx];
+    fetch('/getimage?name=' + encodeURIComponent(name)).then(function(r){
       if(!r.ok){ throw new Error('not found'); }
       return r.arrayBuffer();
     }).then(function(ab){
-      var bytes=new Uint8Array(ab);
-      var img=cv.getContext('2d').createImageData(PV_W, PV_H);
-      var d=img.data, n=PV_W*PV_H;
-      for(var i=0;i<n;i++){
-        var hi=bytes[2*i], lo=bytes[2*i+1];      // big-endian RGB565
-        var p=(hi<<8)|lo;
-        var r5=(p>>11)&0x1f, g6=(p>>5)&0x3f, b5=p&0x1f;
-        d[4*i]  =(r5*255/31)|0;
-        d[4*i+1]=(g6*255/63)|0;
-        d[4*i+2]=(b5*255/31)|0;
-        d[4*i+3]=255;
-      }
-      cv.getContext('2d').putImageData(img,0,0);
-      cv.style.display='block'; lb.style.display='block';
-    }).catch(function(){
-      cv.style.display='none'; lb.style.display='none';
+      var fig=document.createElement('figure');
+      fig.dataset.name=name;
+      fig.onclick=function(){ selectImg(name); };
+      var cv=document.createElement('canvas');
+      cv.width=PV_W; cv.height=PV_H;
+      var cap=document.createElement('figcaption');
+      cap.textContent=name;
+      fig.appendChild(cv); fig.appendChild(cap);
+      document.getElementById('gal').appendChild(fig);
+      decode(ab, cv);
+    }).catch(function(){}).then(function(){
+      loadOne(names, idx+1);     // next image only after this one finishes
+    });
+  }
+  function buildGallery(){
+    fetch('/imagelist').then(function(r){return r.text();}).then(function(t){
+      var names=t.split('|').filter(function(s){return s.length>0;});
+      loadOne(names, 0);
     });
   }
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/setbl?v=' + v); }
+  buildGallery();
   setInterval(function(){
     fetch('/getdisplay').then(function(r){return r.text();}).then(function(v){
       var d=document.getElementById('disp');
       if(d && d.value!==v){ d.value=v; }
+      markSel(v);
     });
   }, 2000);
 </script>
