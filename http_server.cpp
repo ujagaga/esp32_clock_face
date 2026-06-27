@@ -9,7 +9,7 @@
 #include <pgmspace.h>
 #include "wifi_connection.h"
 #include "config.h"
-#include "ESP_clock_face.h"
+#include "esp32_clock_face.h"
 
 // --- HTML templates ---
 static const char HTML_BEGIN[] PROGMEM = R"(

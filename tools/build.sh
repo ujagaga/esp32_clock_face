@@ -11,6 +11,8 @@
 set -euo pipefail
 
 SKETCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BUILD_DIR="$SKETCH_DIR/build"
+CACHE_DIR="$SKETCH_DIR/.cache"
 FQBN="${FQBN:-esp32:esp32:esp32c6}"
 PORT="${PORT:-/dev/ttyACM0}"
 
@@ -20,9 +22,9 @@ command -v arduino-cli >/dev/null 2>&1 || {
 }
 
 echo "Compiling $SKETCH_DIR for $FQBN ..."
-arduino-cli compile --fqbn "$FQBN" "$SKETCH_DIR"
+arduino-cli compile --fqbn "$FQBN" --output-dir "$BUILD_DIR" --build-path "$CACHE_DIR" "$SKETCH_DIR"
 
 if [ "${1:-}" = "upload" ]; then
   echo "Uploading to $PORT ..."
-  arduino-cli upload --fqbn "$FQBN" -p "$PORT" "$SKETCH_DIR"
+  arduino-cli upload --fqbn "$FQBN" -p "$PORT" --input-dir "$BUILD_DIR" "$SKETCH_DIR"
 fi
