@@ -20,6 +20,7 @@
         "${env:HOME}/Arduino/libraries/Adafruit_BusIO",
         "${env:HOME}/.arduino15/packages/esp32/hardware/esp32/3.3.10/libraries/Wire/src",
         "${env:HOME}/.arduino15/packages/esp32/hardware/esp32/3.3.10/libraries/SPI/src",
+        "${env:HOME}/.arduino15/packages/esp32/hardware/esp32/3.3.10/libraries/SD/src",
         "${env:HOME}/Arduino/libraries/ArduinoJson/src",
         "${env:HOME}/Arduino/libraries/WebSockets/src",
         "${env:HOME}/.arduino15/packages/esp32/hardware/esp32/3.3.10/libraries/NetworkClientSecure/src",

@@ -39,4 +39,10 @@
 // Onboard BOOT pushbutton (active low, has external pull-up).
 #define BUTTON_PIN        9
 
+// microSD (TF) card. Shares the SPI bus with the LCD (MOSI=6, SCLK=7);
+// adds MISO and its own chip select.
+#define SD_MISO           5
+#define SD_CS             4
+#define SD_SPI_FREQ       20000000
+
 #endif

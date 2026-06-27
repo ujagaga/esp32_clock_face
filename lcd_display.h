@@ -36,6 +36,13 @@ extern uint16_t LCD_getFgColor(void);
 extern void LCD_setFgColor(uint16_t color);
 extern void LCD_setInverted(bool inverted);
 extern void LCD_rotate180(void);
-extern void LCD_drawSnowflake(int x, int y, int r, uint16_t color);
+extern void LCD_setBacklight(uint8_t percent);
+extern void LCD_flashBacklight(void);
+extern void LCD_busRelease(void);
+extern void LCD_busAcquire(void);
+extern void LCD_imageBegin(void);
+extern void LCD_imagePush(const uint16_t *buf, uint32_t n);
+extern void LCD_imageEnd(void);
+extern void LCD_process(void);
 
 #endif

@@ -26,8 +26,9 @@ class ST7789_Custom : public Adafruit_GFX {
       ledcAttach(TFT_BL, TFT_BL_FREQ, TFT_BL_RES_BITS);
       ledcWrite(TFT_BL, TFT_BL_DUTY);
 
-      // ESP32-C6: route hardware SPI to the board pins (no MISO needed).
-      SPI.begin(TFT_SCLK, -1, TFT_MOSI, TFT_CS);
+      // ESP32-C6: route hardware SPI to the board pins. MISO is attached so the
+      // microSD card (which shares this bus) can read; the LCD itself never reads.
+      SPI.begin(TFT_SCLK, SD_MISO, TFT_MOSI, TFT_CS);
       SPI.setFrequency(24000000);
       SPI.setDataMode(SPI_MODE3);
 
@@ -89,6 +90,32 @@ class ST7789_Custom : public Adafruit_GFX {
       if ((x >= _width) || (y >= _height)) return;
       setAddrWindow(x, y, w, h);
       for (uint32_t i = 0; i < (uint32_t)w * h; i++) SPI.write16(color);
+    }
+
+    // --- Shared SPI bus arbitration (LCD + microSD on one bus) ---
+    // The LCD is normally the only device and is kept selected. When the SD card
+    // needs the bus, release it; before driving the LCD again, re-acquire it
+    // (the SD library changes the SPI clock/mode, so they must be restored).
+    void busRelease() { digitalWrite(TFT_CS, HIGH); }
+    void busAcquire() {
+      digitalWrite(TFT_CS, LOW);
+      // On the ESP32-C6, setFrequency()/setDataMode() do not sync to hardware,
+      // but the SD library's transactions do (cmd.update). A begin/endTransaction
+      // pair forces the config to actually latch again. The panel effectively
+      // runs in MODE0 (the driver's MODE3 setter never latched), so restore MODE0.
+      SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
+      SPI.endTransaction();
+      digitalWrite(TFT_DC, HIGH);
+    }
+
+    // Open a full-screen pixel write (RAMWR). The GRAM pointer auto-increments,
+    // so callers may release/re-acquire the bus between pushPixels() batches.
+    void imageWindow() {
+      busAcquire();
+      setAddrWindow(0, 0, _width, _height);
+    }
+    void pushPixels(const uint16_t *buf, uint32_t n) {
+      for (uint32_t i = 0; i < n; i++) SPI.write16(buf[i]);
     }
 
   private:

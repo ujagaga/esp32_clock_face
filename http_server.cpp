@@ -12,6 +12,7 @@
 #include "esp32_clock_face.h"
 #include "gpio.h"
 #include "lcd_display.h"
+#include "sd_images.h"
 
 // --- HTML templates ---
 static const char HTML_BEGIN[] PROGMEM = R"(
@@ -45,15 +46,21 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   <label for="led">LED color: </label>
   <input type="color" id="led" value="#000000" oninput="setLed(this.value);">
   <br/><br/>
+  <label for="bl">Brightness: </label>
+  <input type="range" id="bl" min="0" max="100" value="100" oninput="setBl(this.value);">
+  <br/><br/>
+  <button class="btn_cfg" type="button" onclick="fetch('/flashbl');">Flash</button>
+  <br/>
   <button class="btn_cfg" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
   <br/>
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
   <br/>
   <hr>
-  <a href='https://github.com/ujagaga/ESP_OLED_Lamp' target="_blank" rel="noopener noreferrer">Source code</a>
+  <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a>
 </div>
 <script>
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
+  function setBl(v){ fetch('/setbl?v=' + v); }
 </script>
 )";
 
@@ -144,7 +151,27 @@ void showStartPage() {
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(INDEX_HTML_0);
   response += "<p>Station IP: " + WIFIC_getStationIp() + "</p>";
-  response += FPSTR(INDEX_HTML_1); 
+
+  // Display selector: clock or one of the SD card images.
+  response += "<label for='disp'>Display: </label>";
+  response += "<select id='disp' onchange=\"fetch('/setdisplay?img=' + encodeURIComponent(this.value));\">";
+  response += "<option value='clock'>Clock</option>";
+  String imgList = SDIMG_list();
+  int start = 0;
+  while(start < imgList.length()){
+    int sep = imgList.indexOf('|', start);
+    if(sep < 0){
+      sep = imgList.length();
+    }
+    String name = imgList.substring(start, sep);
+    if(name.length() > 0){
+      response += "<option value='" + name + "'>" + name + "</option>";
+    }
+    start = sep + 1;
+  }
+  response += "</select>";
+
+  response += FPSTR(INDEX_HTML_1);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);  
 }
@@ -227,6 +254,38 @@ static void flipScreen(void){
   webServer->send(200, "text/plain", "OK");
 }
 
+static void setBacklight(void){
+  int v = webServer->arg("v").toInt();
+  if(v < 0){
+    v = 0;
+  }
+  LCD_setBacklight((uint8_t)v);
+  webServer->send(200, "text/plain", "OK");
+}
+
+static void flashBacklight(void){
+  LCD_flashBacklight();
+  webServer->send(200, "text/plain", "OK");
+}
+
+static void setDisplay(void){
+  String img = webServer->arg("img");
+  if(img.length() == 0 || img == "clock"){
+    MAIN_setDisplayClock();
+  }else{
+    MAIN_setDisplayImage(img);
+  }
+  webServer->send(200, "text/plain", "OK");
+}
+
+static void imageList(void){
+  webServer->send(200, "text/plain", SDIMG_list());
+}
+
+static void apList(void){
+  webServer->send(200, "text/plain", WIFIC_getApList());
+}
+
 // --- Public functions ---
 void HTTP_SERVER_process(void){
   webServer->handleClient(); 
@@ -238,12 +297,17 @@ void HTTP_SERVER_init(void){
   }
   webServer = new WebServer(80);
 
-  webServer->on("/", showStartPage);
-  webServer->on("/favicon.ico", showNotFound);
-  webServer->on("/selectap", selectAP);
-  webServer->on("/wifisave", saveWiFi);
-  webServer->on("/setled", setLed);
-  webServer->on("/flipscreen", flipScreen);
+  webServer->on("/", HTTP_GET, showStartPage);
+  webServer->on("/favicon.ico", HTTP_GET, showNotFound);
+  webServer->on("/selectap", HTTP_GET, selectAP);
+  webServer->on("/wifisave", HTTP_GET, saveWiFi);
+  webServer->on("/setled", HTTP_GET, setLed);
+  webServer->on("/flipscreen", HTTP_GET, flipScreen);
+  webServer->on("/setdisplay", HTTP_GET, setDisplay);
+  webServer->on("/setbl", HTTP_GET, setBacklight);
+  webServer->on("/flashbl", HTTP_GET, flashBacklight);
+  webServer->on("/imagelist", HTTP_GET, imageList);
+  webServer->on("/aplist", HTTP_GET, apList);
   webServer->onNotFound(showStartPage);
   
   webServer->begin();

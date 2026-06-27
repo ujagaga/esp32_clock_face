@@ -25,6 +25,8 @@ static uint16_t bgColor = C_BLACK;
 static uint16_t fgColor = C_YELLOW;
 static bool invertedColors = false;
 static uint8_t currentRotation = 0;
+static uint32_t currentDuty = TFT_BL_DUTY;
+static uint32_t lastBacklightChange = 0;
 
 static uint16_t invertColor(uint16_t color) {
   return ~color;
@@ -155,6 +157,24 @@ void LCD_clearStringArea(String msg) {
   tft.fillRect(x1, y1, w, h, C_BLACK);
 }
 
+// Set backlight brightness. percent (0..100) maps to 0..50% PWM duty, since the
+// panel docs warn against sustained full brightness.
+void LCD_setBacklight(uint8_t percent){
+  if(percent > 100){
+    percent = 100;
+  }
+  uint32_t maxDuty = (1u << TFT_BL_RES_BITS) - 1;
+  currentDuty = ((uint32_t)percent * (maxDuty / 2)) / 100;
+  ledcWrite(TFT_BL, currentDuty);
+}
+
+// Flash to full brightness (bypassing the 50% cap) for 500ms, then restore.
+void LCD_flashBacklight(void){
+  uint32_t maxDuty = (1u << TFT_BL_RES_BITS) - 1;
+  ledcWrite(TFT_BL, maxDuty);
+  lastBacklightChange = millis();  
+}
+
 // Flip the screen 180 degrees (toggle between the rotation and its opposite).
 void LCD_rotate180(void){
   currentRotation ^= 2;
@@ -162,10 +182,66 @@ void LCD_rotate180(void){
   tft.fillScreen(bgColor);
 }
 
+// --- Shared SPI bus + raw image blit ---
+// The microSD card shares the LCD's SPI bus. These wrappers let sd_images.cpp
+// release the bus for SD reads and push raw RGB565 pixels to the panel. The
+// GRAM pointer auto-increments, so reads and pixel pushes can interleave.
+void LCD_busRelease(void){
+#ifdef USE_ADAFRUIT_ST7789
+  tft.endWrite();
+#else
+  tft.busRelease();
+#endif
+}
+
+void LCD_busAcquire(void){
+#ifdef USE_ADAFRUIT_ST7789
+  tft.startWrite();
+#else
+  tft.busAcquire();
+#endif
+}
+
+void LCD_imageBegin(void){
+#ifdef USE_ADAFRUIT_ST7789
+  tft.startWrite();
+  tft.setAddrWindow(0, 0, tft.width(), tft.height());
+  tft.endWrite();
+#else
+  tft.imageWindow();
+  tft.busRelease();
+#endif
+}
+
+void LCD_imagePush(const uint16_t *buf, uint32_t n){
+#ifdef USE_ADAFRUIT_ST7789
+  tft.startWrite();
+  tft.writePixels((uint16_t *)buf, n);
+  tft.endWrite();
+#else
+  tft.busAcquire();
+  tft.pushPixels(buf, n);
+  tft.busRelease();
+#endif
+}
+
+void LCD_imageEnd(void){
+#ifndef USE_ADAFRUIT_ST7789
+  tft.busAcquire();   // restore the LCD-owns-the-bus invariant for clock drawing
+#endif
+}
+
 void LCD_setInverted(bool inverted){
   if(invertedColors != inverted){
     invertedColors = inverted;
     bgColor = invertColor(bgColor);
     fgColor = invertColor(fgColor);
+  }
+}
+
+void LCD_process() {
+  if(lastBacklightChange > 0 && (millis() - lastBacklightChange) > 500) {
+    ledcWrite(TFT_BL, currentDuty);
+    lastBacklightChange = 0;
   }
 }

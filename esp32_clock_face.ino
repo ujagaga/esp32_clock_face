@@ -5,6 +5,7 @@
 #include "web_socket.h"
 #include "lcd_display.h"
 #include "gpio.h"
+#include "sd_images.h"
 
 enum Operation {
   Init,
@@ -22,6 +23,9 @@ static int blikY = 0;
 static String statusMessage = "";         /* This is set and requested from other modules. */
 static String timeStringHH = "";
 static String timeStringMM = "";
+static bool showImage = false;             /* true: show SD image instead of clock */
+static String currentImage = "";
+static bool displayDirty = false;          /* force a redraw on mode/selection change */
 
 void MAIN_setStatusMsg(String msg){
   statusMessage = msg;
@@ -29,6 +33,17 @@ void MAIN_setStatusMsg(String msg){
 
 String MAIN_getStatusMsg(void){
   return statusMessage;
+}
+
+void MAIN_setDisplayClock(void){
+  showImage = false;
+  displayDirty = true;
+}
+
+void MAIN_setDisplayImage(String name){
+  showImage = true;
+  currentImage = name;
+  displayDirty = true;
 }
 
 static void display_boudries()
@@ -68,12 +83,14 @@ void setup(void)
   LCD_init();
   NTPS_init();
   GPIO_init();
+  SDIMG_init();
 }
 
 void loop(void){
   HTTP_SERVER_process();
   WS_process();
   GPIO_process();
+  LCD_process();
   if(WIFIC_stationConnected()){
     NTPS_process();
   } 
@@ -122,6 +139,23 @@ void loop(void){
 
     default:
     {
+      if(showImage){
+        if(displayDirty){
+          SDIMG_show(currentImage);
+          displayDirty = false;
+        }
+        break;
+      }
+
+      if(displayDirty){
+        // Returning from image mode to the clock; force a full redraw.
+        LCD_clear();
+        timeStringHH = "";
+        timeStringMM = "";
+        lastSeconds = -1;
+        displayDirty = false;
+      }
+
       if((millis() - stateChangedAt) > 5000){
         if(NTPS_hasSynced()){
           String hh = NTPS_getHH();
