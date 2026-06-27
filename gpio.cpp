@@ -1,6 +1,6 @@
 #include "gpio.h"
 #include "config.h"
-#include "lcd_display.h"
+#include "esp32_clock_face.h"
 
 // The onboard RGB LED is a single WS2812 (addressable) on RGB_LED_PIN. The
 // ESP32 Arduino core drives it over RMT via neopixelWrite(), so no extra
@@ -13,7 +13,7 @@ void GPIO_init(void)
   GPIO_setLedOff();
 }
 
-// Poll the BOOT button (active low). On a debounced press, flip the screen.
+// Poll the BOOT button (active low). On a debounced press, force the clock.
 void GPIO_process(void)
 {
   static bool wasPressed = false;
@@ -22,7 +22,7 @@ void GPIO_process(void)
   if(pressed && !wasPressed){
     delay(20);                                 // simple debounce
     if(digitalRead(BUTTON_PIN) == LOW){
-      LCD_rotate180();
+      MAIN_setDisplayClock();
       wasPressed = true;
     }
   }else if(!pressed){

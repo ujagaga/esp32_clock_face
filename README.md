@@ -25,7 +25,8 @@ library's transactions do), the LCD's SPI config is re-latched via a
 
 - Boots into AP mode and shows the WiFi SSID / password / IP on screen.
 - After WiFi is configured it connects, syncs time over NTP and shows the clock.
-- Press the BOOT button to flip the screen 180 degrees.
+- Press the BOOT button to force the clock display (switches back from an image).
+- Flip the screen 180 degrees from the web page ("Flip Screen").
 - Backlight is capped at 50% duty by default (the panel docs warn against
   sustained full brightness); the "Flash" function briefly overrides this.
 

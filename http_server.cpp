@@ -61,6 +61,12 @@ const char INDEX_HTML_1[] PROGMEM = R"(
 <script>
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/setbl?v=' + v); }
+  setInterval(function(){
+    fetch('/getdisplay').then(function(r){return r.text();}).then(function(v){
+      var d=document.getElementById('disp');
+      if(d && d.value!==v){ d.value=v; }
+    });
+  }, 2000);
 </script>
 )";
 
@@ -251,6 +257,7 @@ static void setLed(void){
 
 static void flipScreen(void){
   LCD_rotate180();
+  MAIN_displayRefresh();
   webServer->send(200, "text/plain", "OK");
 }
 
@@ -276,6 +283,10 @@ static void setDisplay(void){
     MAIN_setDisplayImage(img);
   }
   webServer->send(200, "text/plain", "OK");
+}
+
+static void getDisplay(void){
+  webServer->send(200, "text/plain", MAIN_getDisplay());
 }
 
 static void imageList(void){
@@ -306,6 +317,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/setdisplay", HTTP_GET, setDisplay);
   webServer->on("/setbl", HTTP_GET, setBacklight);
   webServer->on("/flashbl", HTTP_GET, flashBacklight);
+  webServer->on("/getdisplay", HTTP_GET, getDisplay);
   webServer->on("/imagelist", HTTP_GET, imageList);
   webServer->on("/aplist", HTTP_GET, apList);
   webServer->onNotFound(showStartPage);

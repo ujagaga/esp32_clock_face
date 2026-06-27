@@ -46,6 +46,14 @@ void MAIN_setDisplayImage(String name){
   displayDirty = true;
 }
 
+void MAIN_displayRefresh(void){
+  displayDirty = true;
+}
+
+String MAIN_getDisplay(void){
+  return showImage ? currentImage : String("clock");
+}
+
 static void display_boudries()
 {
   LCD_clear();
