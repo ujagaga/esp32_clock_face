@@ -4,6 +4,7 @@
 #include "NTPSync.h"
 #include "web_socket.h"
 #include "lcd_display.h"
+#include "gpio.h"
 
 enum Operation {
   Init,
@@ -66,11 +67,13 @@ void setup(void)
   HTTP_SERVER_init();  
   LCD_init();
   NTPS_init();
+  GPIO_init();
 }
 
 void loop(void){
   HTTP_SERVER_process();
   WS_process();
+  GPIO_process();
   if(WIFIC_stationConnected()){
     NTPS_process();
   } 

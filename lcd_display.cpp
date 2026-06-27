@@ -21,9 +21,10 @@ ST7789_Custom tft;
 #include "lcd_display.h"
 
 
-static uint16_t bgColor = C_BLACK; 
-static uint16_t fgColor = C_YELLOW; 
+static uint16_t bgColor = C_BLACK;
+static uint16_t fgColor = C_YELLOW;
 static bool invertedColors = false;
+static uint8_t currentRotation = 0;
 
 static uint16_t invertColor(uint16_t color) {
   return ~color;
@@ -36,7 +37,8 @@ void LCD_init()
   ledcWrite(TFT_BL, TFT_BL_DUTY);
   SPI.begin(TFT_SCLK, -1, TFT_MOSI, TFT_CS); // route hardware SPI to board pins
   tft.init(SCREEN_W, SCREEN_H, SPI_MODE3);
-  tft.setRotation(0);
+  currentRotation = 0;
+  tft.setRotation(currentRotation);
 
   tft.fillScreen(bgColor);
   tft.setCursor(0, 0);  
@@ -48,7 +50,8 @@ void LCD_init()
 {
   tft.begin();
   // Set to landscape for a wide "bar" look. Use 0 or 2 for portrait.
-  tft.setRotation(1); 
+  currentRotation = 1;
+  tft.setRotation(currentRotation);
 
   tft.fillScreen(bgColor);
   tft.setCursor(0, 0);
@@ -150,6 +153,13 @@ void LCD_clearStringArea(String msg) {
   
   // Fill that box with black
   tft.fillRect(x1, y1, w, h, C_BLACK);
+}
+
+// Flip the screen 180 degrees (toggle between the rotation and its opposite).
+void LCD_rotate180(void){
+  currentRotation ^= 2;
+  tft.setRotation(currentRotation);
+  tft.fillScreen(bgColor);
 }
 
 void LCD_setInverted(bool inverted){

@@ -10,6 +10,8 @@
 #include "wifi_connection.h"
 #include "config.h"
 #include "esp32_clock_face.h"
+#include "gpio.h"
+#include "lcd_display.h"
 
 // --- HTML templates ---
 static const char HTML_BEGIN[] PROGMEM = R"(
@@ -40,11 +42,19 @@ static const char INDEX_HTML_0[] PROGMEM = R"(
 
 const char INDEX_HTML_1[] PROGMEM = R"(
   <br>
+  <label for="led">LED color: </label>
+  <input type="color" id="led" value="#000000" oninput="setLed(this.value);">
+  <br/><br/>
+  <button class="btn_cfg" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
+  <br/>
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
   <br/>
   <hr>
   <a href='https://github.com/ujagaga/ESP_OLED_Lamp' target="_blank" rel="noopener noreferrer">Source code</a>
 </div>
+<script>
+  function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
+</script>
 )";
 
 static const char APLIST_HTML_0[] PROGMEM = R"(
@@ -201,6 +211,22 @@ static void saveWiFi(void){
   WIFIC_stationMode();
 }
 
+static void setLed(void){
+  String c = webServer->arg("c");
+  if(c.length() != 6){
+    webServer->send(400, "text/plain", "Expected 6 hex digits");
+    return;
+  }
+  uint32_t rgb = (uint32_t)strtoul(c.c_str(), nullptr, 16);
+  GPIO_setLedHex(rgb);
+  webServer->send(200, "text/plain", "OK");
+}
+
+static void flipScreen(void){
+  LCD_rotate180();
+  webServer->send(200, "text/plain", "OK");
+}
+
 // --- Public functions ---
 void HTTP_SERVER_process(void){
   webServer->handleClient(); 
@@ -216,6 +242,8 @@ void HTTP_SERVER_init(void){
   webServer->on("/favicon.ico", showNotFound);
   webServer->on("/selectap", selectAP);
   webServer->on("/wifisave", saveWiFi);
+  webServer->on("/setled", setLed);
+  webServer->on("/flipscreen", flipScreen);
   webServer->onNotFound(showStartPage);
   
   webServer->begin();

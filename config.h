@@ -33,4 +33,10 @@
 #define TFT_BL_RES_BITS   8
 #define TFT_BL_DUTY       128
 
+// Onboard addressable RGB LED (WS2812) on the Waveshare ESP32-C6-LCD-1.47.
+#define RGB_LED_PIN       8
+
+// Onboard BOOT pushbutton (active low, has external pull-up).
+#define BUTTON_PIN        9
+
 #endif
