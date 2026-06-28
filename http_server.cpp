@@ -36,8 +36,16 @@ static const char INDEX_HTML_0[] PROGMEM = R"(
 <style>
   .btn_cfg{border:0;border-radius:0.3rem;color:#fff;line-height:1.4rem;font-size:0.8rem;margin:1ch;height:2rem;width:10rem;background-color:#ff3300;}
 </style>
+<style>
+  #status{position:sticky;top:0;z-index:10;min-height:1.4rem;padding:0.4rem;margin-bottom:0.5rem;
+    border-radius:0.3rem;font-size:0.85rem;display:none;text-align:left;}
+  #status.ok{display:block;background:#d4edda;color:#155724;}
+  #status.err{display:block;background:#f8d7da;color:#721c24;}
+  #status.info{display:block;background:#e2e3e5;color:#383d41;}
+</style>
 <div class="contain">
   <div class="center_div">
+  <div id="status"></div>
   <h1>WiFi Clock</h1>
 )";
 
@@ -56,6 +64,9 @@ const char INDEX_HTML_1[] PROGMEM = R"(
   <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
   <br/>
   <hr>
+  <label for="up">Upload image: </label>
+  <input type="file" id="up" accept="image/*" onchange="uploadFile(this.files[0]);">
+  <hr>
   <p>Gallery (click to display):</p>
   <div id="gal"></div>
   <hr>
@@ -70,6 +81,11 @@ const char INDEX_HTML_1[] PROGMEM = R"(
 </style>
 <script>
   var PV_W=320, PV_H=172;
+  function showStatus(msg, kind){
+    var s=document.getElementById('status');
+    s.textContent=msg;
+    s.className=kind||'info';
+  }
   function selectImg(name){ fetch('/setdisplay?img=' + encodeURIComponent(name)); markSel(name); }
   function markSel(name){
     var figs=document.querySelectorAll('#gal figure');
@@ -120,6 +136,49 @@ const char INDEX_HTML_1[] PROGMEM = R"(
       var names=t.split('|').filter(function(s){return s.length>0;});
       loadOne(names, 0);
     });
+  }
+  // Resize+crop to PV_W x PV_H, pack big-endian RGB565, POST to /upload.
+  function uploadFile(file){
+    if(!file){ return; }
+    showStatus('Resizing ' + file.name + '...', 'info');
+    var url=URL.createObjectURL(file);
+    var im=new Image();
+    im.onload=function(){
+      URL.revokeObjectURL(url);
+      var cv=document.createElement('canvas');
+      cv.width=PV_W; cv.height=PV_H;
+      var ctx=cv.getContext('2d');
+      // cover: scale to fill, center-crop
+      var s=Math.max(PV_W/im.width, PV_H/im.height);
+      var dw=im.width*s, dh=im.height*s;
+      ctx.drawImage(im, (PV_W-dw)/2, (PV_H-dh)/2, dw, dh);
+      var d=ctx.getImageData(0,0,PV_W,PV_H).data;
+      var n=PV_W*PV_H, out=new Uint8Array(n*2);
+      for(var i=0;i<n;i++){
+        var r=d[4*i], g=d[4*i+1], b=d[4*i+2];
+        var p=((r&0xf8)<<8)|((g&0xfc)<<3)|(b>>3);
+        out[2*i]=(p>>8)&0xff;        // big-endian
+        out[2*i+1]=p&0xff;
+      }
+      // strip extension, force .bin
+      var base=file.name.replace(/\.[^.]+$/,'').replace(/[^A-Za-z0-9_-]/g,'_').substring(0,28);
+      var fname=base+'.bin';
+      var fd=new FormData();
+      fd.append('f', new Blob([out], {type:'application/octet-stream'}), fname);
+      showStatus('Uploading ' + fname + ' (' + (out.length) + ' bytes)...', 'info');
+      fetch('/upload', {method:'POST', body:fd}).then(function(r){
+        return r.text().then(function(t){
+          if(r.ok){
+            showStatus('Uploaded ' + fname, 'ok');
+            document.getElementById('gal').innerHTML=''; buildGallery();
+          }else{
+            showStatus('Upload failed: ' + t, 'err');
+          }
+        });
+      }).catch(function(e){ showStatus('Upload error: ' + e.message, 'err'); });
+    };
+    im.onerror=function(){ URL.revokeObjectURL(url); showStatus('Cannot read image file', 'err'); };
+    im.src=url;
   }
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/setbl?v=' + v); }
@@ -364,6 +423,41 @@ static void getImage(void){
   }
 }
 
+static bool uploadOk = false;
+
+// Streams a multipart file upload straight to the SD card, chunk by chunk.
+static void uploadImage(void){
+  HTTPUpload& up = webServer->upload();
+  if(up.status == UPLOAD_FILE_START){
+    uploadOk = SDIMG_writeBegin(up.filename);
+  }else if(up.status == UPLOAD_FILE_WRITE){
+    if(uploadOk){
+      uploadOk = SDIMG_writeChunk(up.buf, up.currentSize);
+    }
+  }else if(up.status == UPLOAD_FILE_END){
+    if(uploadOk){
+      uploadOk = SDIMG_writeEnd();
+    }else{
+      SDIMG_writeAbort();   // a chunk failed: close file, reacquire LCD bus
+    }
+  }else{
+    SDIMG_writeAbort();
+    uploadOk = false;
+  }
+}
+
+static void uploadDone(void){
+  if(uploadOk){
+    webServer->send(200, "text/plain", "OK");
+  }else{
+    String err = SDIMG_lastError();
+    if(err.length() == 0){
+      err = "Upload failed";
+    }
+    webServer->send(400, "text/plain", err);
+  }
+}
+
 static void apList(void){
   webServer->send(200, "text/plain", WIFIC_getApList());
 }
@@ -391,6 +485,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/getdisplay", HTTP_GET, getDisplay);
   webServer->on("/imagelist", HTTP_GET, imageList);
   webServer->on("/getimage", HTTP_GET, getImage);
+  webServer->on("/upload", HTTP_POST, uploadDone, uploadImage);
   webServer->on("/aplist", HTTP_GET, apList);
   webServer->onNotFound(showStartPage);
   

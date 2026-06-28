@@ -15,4 +15,11 @@ extern String SDIMG_list(void);            // image file names joined with '|'
 extern bool SDIMG_show(String name);       // draw the named file full screen
 extern bool SDIMG_sendRaw(String name, WebServer* server);  // stream raw bytes to HTTP client
 
+// Incremental write of an uploaded image to SD (call in START/WRITE/END order).
+extern bool SDIMG_writeBegin(String name);
+extern bool SDIMG_writeChunk(const uint8_t* buf, size_t len);
+extern bool SDIMG_writeEnd(void);
+extern void SDIMG_writeAbort(void);
+extern String SDIMG_lastError(void);       // reason the last upload failed
+
 #endif

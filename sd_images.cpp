@@ -115,3 +115,103 @@ bool SDIMG_sendRaw(String name, WebServer* server){
   f.close();
   return true;
 }
+
+// --- Incremental upload to SD ---
+static File uploadFile;
+static String uploadPath;
+static String uploadErr;
+
+String SDIMG_lastError(void){
+  return uploadErr;
+}
+
+// Sanitize to a safe root-level "<name>.bin" path. Returns "" if invalid.
+static String sanitizeName(String name){
+  int slash = name.lastIndexOf('/');
+  if(slash >= 0){
+    name = name.substring(slash + 1);
+  }
+  slash = name.lastIndexOf('\\');
+  if(slash >= 0){
+    name = name.substring(slash + 1);
+  }
+  if(name.length() == 0 || name.length() > 32){
+    return "";
+  }
+  for(unsigned i = 0; i < name.length(); i++){
+    char c = name[i];
+    bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+    if(!ok){
+      return "";
+    }
+  }
+  if(!name.endsWith(".bin") && !name.endsWith(".BIN")){
+    name += ".bin";
+  }
+  return "/" + name;
+}
+
+// The SD bus is held (LCD released) for the whole upload: begin->chunks->end.
+// Re-acquiring the LCD bus between chunks re-latches SPI on the C6 and silently
+// corrupts the in-progress SD write. See [[c6-spi-mode-latch]].
+bool SDIMG_writeBegin(String name){
+  uploadErr = "";
+  if(!cardReady){
+    uploadErr = "SD card not ready";
+    return false;
+  }
+  uploadPath = sanitizeName(name);
+  if(uploadPath.length() == 0){
+    uploadErr = "Invalid file name: '" + name + "'";
+    return false;
+  }
+  LCD_busRelease();
+  if(SD.exists(uploadPath)){
+    SD.remove(uploadPath);
+  }
+  uploadFile = SD.open(uploadPath, FILE_WRITE);
+  if(!uploadFile){
+    LCD_busAcquire();
+    uploadErr = "Cannot open " + uploadPath + " for write";
+    return false;
+  }
+  return true;
+}
+
+bool SDIMG_writeChunk(const uint8_t* buf, size_t len){
+  if(!uploadFile){
+    return false;
+  }
+  size_t wrote = uploadFile.write(buf, len);
+  if(wrote != len){
+    uploadErr = "SD write failed (wrote " + String(wrote) + " of " + String(len) + ")";
+    return false;
+  }
+  return true;
+}
+
+bool SDIMG_writeEnd(void){
+  if(!uploadFile){
+    return false;
+  }
+  uploadFile.flush();
+  size_t size = uploadFile.size();
+  uploadFile.close();
+  size_t expected = (size_t)(SCREEN_W * SCREEN_H * 2);
+  bool sizeOk = (size == expected);
+  if(!sizeOk){
+    SD.remove(uploadPath);
+    uploadErr = "Wrong size: got " + String(size) + " bytes, expected " + String(expected);
+  }
+  LCD_busAcquire();
+  return sizeOk;
+}
+
+void SDIMG_writeAbort(void){
+  if(uploadFile){
+    uploadFile.close();
+    SD.remove(uploadPath);
+    LCD_busAcquire();
+  }
+}
