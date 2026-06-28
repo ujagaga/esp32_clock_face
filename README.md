@@ -3,7 +3,14 @@
 A WiFi-connected NTP clock for the **Waveshare ESP32-C6-LCD-1.47** board. Shows
 the time on the built-in LCD, or a still image loaded from a microSD card. The
 onboard RGB LED, screen brightness, orientation and display mode are all
-controllable from a built-in web page and a matching HTTP GET API.
+controllable from a built-in web page and a matching HTTP API.
+
+The web page shows a dark-themed gallery: a live clock tile plus a thumbnail of
+every image on the SD card, rendered in the browser. Tap a thumbnail to display
+it on the LCD (selected item is highlighted), delete one with the ✕ overlay, or
+upload a new image straight from the browser — it is resized, cropped and
+converted to RGB565 client-side, then streamed to the card. Time and the active
+display are pushed to the page over a WebSocket (no polling).
 
 ## Hardware
 
@@ -46,7 +53,7 @@ library's transactions do), the LCD's SPI config is re-latched via a
 | NTPClient | NTP time |
 | Time | time keeping (dependency of Timezone) |
 | Timezone | local time / DST |
-| WebSockets (by Markus Sattler) | network-scan WebSocket |
+| WebSockets (by Markus Sattler) | WebSocket (WiFi scan, time + active-display push) |
 | Adafruit ST7789 | *optional* — only if you enable `USE_ADAFRUIT_ST7789` in `config.h` |
 
 Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`, `SD`,
@@ -98,9 +105,9 @@ build is the source of truth — VS Code is only for editing.
 
 ## HTTP API
 
-All endpoints are **HTTP GET only**. Base URL is the device IP (port 80).
-Action endpoints return `OK` (or `400` on bad input); list endpoints return a
-`|`-separated string.
+Base URL is the device IP (port 80). Most endpoints are **HTTP GET**; image
+upload is **POST**. Action endpoints return `OK` (or `400` on bad input); list
+endpoints return a `|`-separated string.
 
 | Endpoint | Description | Example |
 |---|---|---|
@@ -110,10 +117,17 @@ Action endpoints return `OK` (or `400` on bad input); list endpoints return a
 | `GET /flipscreen` | Rotate the screen 180 degrees | `/flipscreen` |
 | `GET /setdisplay?img=NAME` | Show SD image `NAME`, or `clock` for the clock | `/setdisplay?img=eyes1.bin` |
 | `GET /imagelist` | List `*.bin` images on the SD card | `eyes1.bin\|logo.bin` |
+| `GET /getimage?name=NAME` | Raw RGB565 bytes of an image (used by the gallery) | `/getimage?name=eyes1.bin` |
+| `POST /upload` | Upload an image (multipart, raw RGB565 `.bin`, must be 320x172) | |
+| `GET /delete?name=NAME` | Delete an image from the SD card | `/delete?name=eyes1.bin` |
 | `GET /aplist` | Scan and list nearby WiFi networks (blocking scan) | `Home\|Office` |
 | `GET /wifisave?s=SSID&p=PASS` | Save WiFi credentials and switch to station mode | `/wifisave?s=Home&p=secret` |
 | `GET /` | Main web page | |
 | `GET /selectap` | WiFi configuration page | |
+
+The WebSocket server (port 81) carries: `{"APLIST":""}` → network list,
+`{"GETDISP":""}` → current display name, and server-pushed `{"TIME":"HH|MM|SS|DD.MM"}`
+(once per second) and `{"DISP":"name"}` (on change).
 
 Example:
 
@@ -125,23 +139,23 @@ curl "http://192.168.4.1/imagelist"
 ## Displaying images from SD
 
 Images are stored as raw **RGB565, big-endian**, sized to the screen
-(**320x172** landscape), with a `.bin` extension, in the SD card root. Convert
-any image with the helper script (requires `ffmpeg`):
+(**320x172** landscape), with a `.bin` extension, in the SD card root.
 
-```bash
-tools/img2rgb565.sh photo.jpg          # -> photo.bin
-tools/img2rgb565.sh photo.jpg out.bin  # explicit output name
-```
+Upload them straight from the web page: click **Upload images**, select one or
+more files, and the browser resizes/crops each to 320x172, converts it to RGB565
+and sends them to the card one at a time. They then appear in the gallery and in
+`/imagelist`. Delete any image from the gallery with its ✕ overlay button.
 
-Copy the `.bin` file to the SD card root; it then appears in the web page
-dropdown and in `/imagelist`.
+> **Note:** All images are same file size, so deleting an image frees its clusters in the FAT, and the next upload
+> reuses that free space — deleting and re-uploading churns the same space, no
+> leak or manual cleanup needed.
 
 ## Scripts (`tools/`)
 
 | Script | Description |
 |---|---|
 | `build.sh` | Compile (and optionally `upload`) the firmware with arduino-cli. Honors `FQBN` and `PORT` env vars. |
-| `img2rgb565.sh` | Crop/scale an image to 320x172 and convert it to a raw RGB565 (big-endian) `.bin` for the SD card. Requires `ffmpeg`. |
 
-(`tools/eyes1.png` / `tools/eyes1.bin` are a sample image and its converted output.)
+Image conversion is done in the browser at upload time (see *Displaying images
+from SD*), so no offline conversion script is needed.
 

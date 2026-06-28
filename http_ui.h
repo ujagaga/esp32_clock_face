@@ -69,8 +69,8 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       <button class="btn" type="button" onclick="fetch('/flashbl');">Flash</button>
       <button class="btn" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
       <button class="btn" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
-      <label class="btn accent" for="up">Upload image</label>
-      <input type="file" id="up" accept="image/*" style="display:none" onchange="uploadFile(this.files[0]);">
+      <label class="btn accent" for="up">Upload images</label>
+      <input type="file" id="up" accept="image/*" multiple style="display:none" onchange="uploadFiles(this.files);">
     </div>
   </div>
   <div class="card">
@@ -219,48 +219,62 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       loadOne(names, 0);
     });
   }
-  // Resize+crop to PV_W x PV_H, pack big-endian RGB565, POST to /upload.
-  function uploadFile(file){
-    if(!file){ return; }
-    showStatus('Resizing ' + file.name + '...', 'info');
-    var url=URL.createObjectURL(file);
-    var im=new Image();
-    im.onload=function(){
-      URL.revokeObjectURL(url);
-      var cv=document.createElement('canvas');
-      cv.width=PV_W; cv.height=PV_H;
-      var ctx=cv.getContext('2d');
-      // cover: scale to fill, center-crop
-      var s=Math.max(PV_W/im.width, PV_H/im.height);
-      var dw=im.width*s, dh=im.height*s;
-      ctx.drawImage(im, (PV_W-dw)/2, (PV_H-dh)/2, dw, dh);
-      var d=ctx.getImageData(0,0,PV_W,PV_H).data;
-      var n=PV_W*PV_H, out=new Uint8Array(n*2);
-      for(var i=0;i<n;i++){
-        var r=d[4*i], g=d[4*i+1], b=d[4*i+2];
-        var p=((r&0xf8)<<8)|((g&0xfc)<<3)|(b>>3);
-        out[2*i]=(p>>8)&0xff;        // big-endian
-        out[2*i+1]=p&0xff;
+  // Resize+crop one file to PV_W x PV_H, pack big-endian RGB565, POST to /upload.
+  // Resolves true on success, false on failure (never rejects).
+  function uploadOne(file, label){
+    return new Promise(function(resolve){
+      var url=URL.createObjectURL(file);
+      var im=new Image();
+      im.onload=function(){
+        URL.revokeObjectURL(url);
+        var cv=document.createElement('canvas');
+        cv.width=PV_W; cv.height=PV_H;
+        var ctx=cv.getContext('2d');
+        // cover: scale to fill, center-crop
+        var s=Math.max(PV_W/im.width, PV_H/im.height);
+        var dw=im.width*s, dh=im.height*s;
+        ctx.drawImage(im, (PV_W-dw)/2, (PV_H-dh)/2, dw, dh);
+        var d=ctx.getImageData(0,0,PV_W,PV_H).data;
+        var n=PV_W*PV_H, out=new Uint8Array(n*2);
+        for(var i=0;i<n;i++){
+          var r=d[4*i], g=d[4*i+1], b=d[4*i+2];
+          var p=((r&0xf8)<<8)|((g&0xfc)<<3)|(b>>3);
+          out[2*i]=(p>>8)&0xff;        // big-endian
+          out[2*i+1]=p&0xff;
+        }
+        // strip extension, force .bin
+        var base=file.name.replace(/\.[^.]+$/,'').replace(/[^A-Za-z0-9_-]/g,'_').substring(0,28);
+        var fname=base+'.bin';
+        var fd=new FormData();
+        fd.append('f', new Blob([out], {type:'application/octet-stream'}), fname);
+        showStatus(label + 'uploading ' + fname + '...', 'info');
+        fetch('/upload', {method:'POST', body:fd}).then(function(rsp){
+          return rsp.text().then(function(t){
+            if(rsp.ok){ resolve(true); }
+            else{ showStatus('Upload failed: ' + t, 'err'); resolve(false); }
+          });
+        }).catch(function(e){ showStatus('Upload error: ' + e.message, 'err'); resolve(false); });
+      };
+      im.onerror=function(){ URL.revokeObjectURL(url); showStatus('Cannot read ' + file.name, 'err'); resolve(false); };
+      im.src=url;
+    });
+  }
+  // Accept a multiple-file selection; send them to the ESP32 one at a time.
+  function uploadFiles(list){
+    if(!list || !list.length){ return; }
+    var files=Array.prototype.slice.call(list);
+    var ok=0, idx=0;
+    function next(){
+      if(idx>=files.length){
+        showStatus('Uploaded ' + ok + ' of ' + files.length + ' image(s)', ok ? 'ok' : 'err');
+        document.getElementById('gal').innerHTML=''; buildGallery();
+        return;
       }
-      // strip extension, force .bin
-      var base=file.name.replace(/\.[^.]+$/,'').replace(/[^A-Za-z0-9_-]/g,'_').substring(0,28);
-      var fname=base+'.bin';
-      var fd=new FormData();
-      fd.append('f', new Blob([out], {type:'application/octet-stream'}), fname);
-      showStatus('Uploading ' + fname + ' (' + (out.length) + ' bytes)...', 'info');
-      fetch('/upload', {method:'POST', body:fd}).then(function(r){
-        return r.text().then(function(t){
-          if(r.ok){
-            showStatus('Uploaded ' + fname, 'ok');
-            document.getElementById('gal').innerHTML=''; buildGallery();
-          }else{
-            showStatus('Upload failed: ' + t, 'err');
-          }
-        });
-      }).catch(function(e){ showStatus('Upload error: ' + e.message, 'err'); });
-    };
-    im.onerror=function(){ URL.revokeObjectURL(url); showStatus('Cannot read image file', 'err'); };
-    im.src=url;
+      var f=files[idx++];
+      var label=files.length>1 ? ('['+idx+'/'+files.length+'] ') : '';
+      uploadOne(f, label).then(function(good){ if(good){ ok++; } next(); });
+    }
+    next();
   }
   function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/setbl?v=' + v); }
