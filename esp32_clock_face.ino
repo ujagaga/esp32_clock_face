@@ -5,6 +5,7 @@
 #include "lcd_display.h"
 #include "gpio.h"
 #include "sd_images.h"
+#include "tcp_server.h"
 
 enum Operation {
   Init,
@@ -86,6 +87,7 @@ void setup(void)
   Serial.begin(115200);
   WIFIC_init();
   HTTP_SERVER_init();
+  TCP_init();
   LCD_init();
   NTPS_init();
   GPIO_init();
@@ -94,6 +96,7 @@ void setup(void)
 
 void loop(void){
   HTTP_SERVER_process();
+  TCP_process();
   GPIO_process();
   LCD_process();
   WIFIC_process();

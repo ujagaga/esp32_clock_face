@@ -429,6 +429,21 @@ static const char API_HTML_1[] PROGMEM = R"(
     <tr><td class="m">GET</td><td><code>/api</code></td><td>This documentation page</td></tr>
   </table>
   <p class="sub">The page reads state once on load &mdash; reload to refresh.</p>
+
+  <h2>TCP API (JSON, port 333)</h2>
+  <p class="sub">One JSON object per line in, one per line out. One client at a time.</p>
+  <table>
+    <tr><th>Command</th><th>Reply</th></tr>
+    <tr><td><code>{"cmd":"list"}</code></td><td><code>{"images":"a.bin|b.bin"}</code></td></tr>
+    <tr><td><code>{"cmd":"getdisplay"}</code></td><td><code>{"display":"clock"}</code></td></tr>
+    <tr><td><code>{"cmd":"setdisplay","img":"a.bin"}</code></td><td><code>{"ok":true}</code> (img <code>clock</code> or omitted = clock)</td></tr>
+    <tr><td><code>{"cmd":"gettime"}</code></td><td><code>{"time":"HH|MM|SS|DD.MM"}</code></td></tr>
+    <tr><td><code>{"cmd":"setled","c":"00ff00"}</code></td><td><code>{"ok":true}</code></td></tr>
+    <tr><td><code>{"cmd":"setbl","v":50}</code></td><td><code>{"ok":true}</code></td></tr>
+    <tr><td><code>{"cmd":"flashbl"}</code></td><td><code>{"ok":true}</code></td></tr>
+    <tr><td><code>{"cmd":"flipscreen"}</code></td><td><code>{"ok":true}</code></td></tr>
+    <tr><td><code>{"cmd":"httpserver","enable":false}</code></td><td><code>{"ok":true,"running":false}</code> &mdash; refused while a browser is connected; omit <code>enable</code> to query</td></tr>
+  </table>
 </div></div>
 )";
 

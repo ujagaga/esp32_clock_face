@@ -220,12 +220,40 @@ static void getTime(void){
   webServer->send(200, "text/plain", r);
 }
 
+static bool httpRunning = false;
+
 // --- Public functions ---
 void HTTP_SERVER_process(void){
-  webServer->handleClient(); 
+  if(httpRunning){
+    webServer->handleClient();
+  }
 }
 
-void HTTP_SERVER_init(void){   
+// Best-effort: true while a browser holds an (keep-alive) connection. Used to
+// avoid tearing down the server out from under an active web user.
+bool HTTP_SERVER_clientConnected(void){
+  return (webServer != nullptr) && webServer->client().connected();
+}
+
+bool HTTP_SERVER_isRunning(void){
+  return httpRunning;
+}
+
+void HTTP_SERVER_start(void){
+  if(webServer != nullptr && !httpRunning){
+    webServer->begin();
+    httpRunning = true;
+  }
+}
+
+void HTTP_SERVER_stop(void){
+  if(webServer != nullptr && httpRunning){
+    webServer->close();
+    httpRunning = false;
+  }
+}
+
+void HTTP_SERVER_init(void){
   if (webServer != nullptr) {
     delete webServer; // Clean up old one
   }
@@ -249,6 +277,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/getdisplay", HTTP_GET, getDisplay);
   webServer->on("/gettime", HTTP_GET, getTime);
   webServer->onNotFound(showStartPage);
-  
+
   webServer->begin();
+  httpRunning = true;
 }

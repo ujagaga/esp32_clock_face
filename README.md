@@ -64,6 +64,7 @@ library's transactions do), the LCD's SPI config is re-latched via a
 | NTPClient | NTP time |
 | Time | time keeping (dependency of Timezone) |
 | Timezone | local time / DST |
+| ArduinoJson | JSON parsing/serialization for the TCP API |
 | Adafruit ST7789 | *optional* — only if you enable `USE_ADAFRUIT_ST7789` in `config.h` |
 
 Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`, `SD`,
@@ -162,6 +163,39 @@ curl "http://192.168.4.1/api/setled?c=ff0000"
 curl "http://192.168.4.1/api/imagelist"
 ```
 
+## TCP API (JSON)
+
+A line-based JSON API runs on TCP port **333** (`TCP_API_PORT` in `config.h`),
+in parallel with the HTTP server. Send one JSON object per line (`\n`-terminated);
+the device replies with one JSON object per line. One client at a time.
+
+| Command | Reply |
+|---|---|
+| `{"cmd":"list"}` | `{"images":"eyes1.bin\|eyes2.bin"}` |
+| `{"cmd":"getdisplay"}` | `{"display":"clock"}` |
+| `{"cmd":"setdisplay","img":"eyes1.bin"}` | `{"ok":true}` (use `"clock"` or omit `img` for the clock) |
+| `{"cmd":"gettime"}` | `{"time":"HH\|MM\|SS\|DD.MM"}` (empty until NTP-synced) |
+| `{"cmd":"setled","c":"00ff00"}` | `{"ok":true}` (6 hex digits) |
+| `{"cmd":"setbl","v":50}` | `{"ok":true}` (0..100) |
+| `{"cmd":"flashbl"}` | `{"ok":true}` |
+| `{"cmd":"flipscreen"}` | `{"ok":true}` |
+| `{"cmd":"httpserver","enable":false}` | `{"ok":true,"running":false}` — stop the HTTP server to save CPU; **refused** (`{"ok":false,"error":"http client connected","running":true}`) while a browser is connected. `"enable":true` restarts it; omit `enable` to just query `{"running":bool}`. |
+
+```bash
+printf '{"cmd":"list"}\n'                       | nc 192.168.4.1 333
+printf '{"cmd":"setdisplay","img":"eyes1.bin"}\n' | nc 192.168.4.1 333
+printf '{"cmd":"httpserver","enable":false}\n'   | nc 192.168.4.1 333
+```
+
+Or use the bundled Python client (`tools/tcp_api.py`):
+
+```bash
+tools/tcp_api.py 192.168.4.1 list
+tools/tcp_api.py 192.168.4.1 setdisplay eyes1.bin
+tools/tcp_api.py 192.168.4.1 setled 00ff00
+tools/tcp_api.py 192.168.4.1 httpserver off
+```
+
 ## Displaying images from SD
 
 Images are stored as raw **RGB565, big-endian**, sized to the screen
@@ -181,6 +215,7 @@ and sends them to the card one at a time. They then appear in the gallery and in
 | Script | Description |
 |---|---|
 | `build.sh` | Compile (and optionally `upload`) the firmware with arduino-cli. Honors `FQBN` and `PORT` env vars. |
+| `tcp_api.py` | Command-line client for the JSON-over-TCP API (`tcp_api.py <host> <command>`; `-h` for the command list). |
 
 Image conversion is done in the browser at upload time (see *Displaying images
 from SD*), so no offline conversion script is needed.
