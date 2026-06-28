@@ -184,7 +184,23 @@ void WIFIC_process(void) {
 // -----------------------------------------------------------------------------
 // Return list of scanned APs
 // -----------------------------------------------------------------------------
-// Kick off a non-blocking scan; results are read later via WIFIC_getApList().
+#ifdef USE_WEBSOCKETS
+// WebSocket UI: the scan runs inside the WS request handler, so a simple
+// blocking scan is fine (the result is sent back in the same call).
+String WIFIC_getApList(void) {
+    String result = "";
+    int n = WiFi.scanNetworks();
+    if (n > 0) {
+        result = WiFi.SSID(0);
+        for (int i = 1; i < n; ++i) {
+            result += "|" + WiFi.SSID(i);
+        }
+    }
+    return result;
+}
+#else
+// No-WebSocket UI: kick off a non-blocking scan, read results later so the
+// HTTP handler never blocks. The page polls WIFIC_getApList() via /aplist.
 void WIFIC_startScan(void) {
     WiFi.scanDelete();
     WiFi.scanNetworks(true);             // async
@@ -203,6 +219,7 @@ String WIFIC_getApList(void) {
     WiFi.scanDelete();                   // free the result buffer
     return result;
 }
+#endif
 
 String WIFIC_getStationIp()
 {

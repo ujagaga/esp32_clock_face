@@ -9,15 +9,22 @@ The web page shows a dark-themed gallery: a clock tile plus a thumbnail of every
 image on the SD card, rendered in the browser. Tap a thumbnail to display it on
 the LCD (the active item is highlighted), delete one with the ✕ overlay, or
 upload a new image straight from the browser — it is resized, cropped and
-converted to RGB565 client-side, then streamed to the card. The page reads its
-state (time, active display) once on load; **reload to refresh** it.
+converted to RGB565 client-side, then streamed to the card. By default the page
+reads its state (time, active display) once on load — **reload to refresh** it.
 
-> **Branch note:** the `esp32-c6-websockets` branch implements the same features
-> over a WebSocket instead — the clock and active display update live in the
-> browser (no reload), giving a nicer UI. The trade-off is higher CPU usage from
-> the persistent connection and per-second pushes, which may leave less headroom
-> for additional features. This `main` branch uses simple load-time fetches and
-> is the lighter-weight option.
+### Live UI over WebSocket (optional)
+
+Define `USE_WEBSOCKETS` in `config.h` to switch the web UI to a WebSocket (port
+81): the clock tile and active-image highlight then update **live** in the
+browser (no reload). The trade-off is higher CPU/RAM use from the persistent
+connection and per-second pushes, plus two extra libraries
+(**WebSockets**, **ArduinoJson**) — so leave it off if you add CPU-heavy
+features. The two modes share all the same page styling; only the data transport
+differs (`http_ui.h` for load-time fetches, `http_ui_ws.h` for WebSocket).
+
+> **Branch note:** `esp32-c6-no-ws` archives the original no-WebSocket-only code,
+> and `esp32-c6-websockets` archives the WebSocket-only version. On `main` the two
+> are merged and selected with the `USE_WEBSOCKETS` flag above.
 
 ## Hardware
 
@@ -64,6 +71,8 @@ library's transactions do), the LCD's SPI config is re-latched via a
 | NTPClient | NTP time |
 | Time | time keeping (dependency of Timezone) |
 | Timezone | local time / DST |
+| WebSockets (by Markus Sattler) | *optional* — only if you enable `USE_WEBSOCKETS` in `config.h` |
+| ArduinoJson | *optional* — only if you enable `USE_WEBSOCKETS` in `config.h` |
 | Adafruit ST7789 | *optional* — only if you enable `USE_ADAFRUIT_ST7789` in `config.h` |
 
 Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`, `SD`,
@@ -154,6 +163,11 @@ Used by the built-in web pages; not part of the automation surface.
 
 WiFi scanning is non-blocking: serving `/selectap` kicks off a scan, and the page
 fetches `/aplist` ~10 s later to populate the list (with a couple of retries).
+
+With `USE_WEBSOCKETS` enabled, `/getdisplay` and `/gettime` are dropped (the page
+gets time and the active display pushed over the WebSocket on port 81 instead),
+and the config page requests its scan over the same socket rather than polling
+`/aplist`.
 
 Example:
 

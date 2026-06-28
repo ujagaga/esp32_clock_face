@@ -13,7 +13,11 @@
 #include "lcd_display.h"
 #include "sd_images.h"
 #include "NTPSync.h"
+#ifdef USE_WEBSOCKETS
+#include "http_ui_ws.h"
+#else
 #include "http_ui.h"
+#endif
 
 // --- Web server object ---
 WebServer* webServer = nullptr;
@@ -56,7 +60,10 @@ static void showStatusPage(bool goToHome = false) {
 }
 
 static void selectAP(void) {
+#ifndef USE_WEBSOCKETS
   WIFIC_startScan();   // kick off the scan; JS fetches /aplist ~10 s later
+                       // (with WebSockets, the scan is started over the socket)
+#endif
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(APLIST_HTML_0);
   response += FPSTR(NAV_HTML);
@@ -205,6 +212,9 @@ static void apList(void){
   webServer->send(200, "text/plain", WIFIC_getApList());
 }
 
+#ifndef USE_WEBSOCKETS
+// Load-time state fetches for the no-WebSocket UI. With WebSockets the page gets
+// time and active display pushed instead, so these endpoints aren't registered.
 static void getDisplay(void){
   webServer->send(200, "text/plain", MAIN_getDisplay());
 }
@@ -219,6 +229,7 @@ static void getTime(void){
              String(NTPS_getSeconds()) + "|" + NTPS_getDate();
   webServer->send(200, "text/plain", r);
 }
+#endif
 
 // --- Public functions ---
 void HTTP_SERVER_process(void){
@@ -246,8 +257,10 @@ void HTTP_SERVER_init(void){
   webServer->on("/upload", HTTP_POST, uploadDone, uploadImage);
   webServer->on("/delete", HTTP_GET, deleteImage);
   webServer->on("/aplist", HTTP_GET, apList);
+#ifndef USE_WEBSOCKETS
   webServer->on("/getdisplay", HTTP_GET, getDisplay);
   webServer->on("/gettime", HTTP_GET, getTime);
+#endif
   webServer->onNotFound(showStartPage);
   
   webServer->begin();

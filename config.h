@@ -7,6 +7,12 @@
 // remappable ESP32-C6 SPI pins below.
 // #define USE_ADAFRUIT_ST7789
 
+// Live web UI over WebSocket (port 81): the browser clock tile and active-image
+// highlight update in real time instead of only on page load. Costs extra
+// CPU/RAM and pulls in the WebSockets + ArduinoJson libraries. Leave undefined
+// for the lighter load-time-fetch UI (recommended if you add CPU-heavy features).
+// #define USE_WEBSOCKETS
+
 #define SCREEN_W  172
 #define SCREEN_H  320
 

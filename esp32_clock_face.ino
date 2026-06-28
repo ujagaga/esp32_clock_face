@@ -5,6 +5,9 @@
 #include "lcd_display.h"
 #include "gpio.h"
 #include "sd_images.h"
+#ifdef USE_WEBSOCKETS
+#include "web_socket.h"
+#endif
 
 enum Operation {
   Init,
@@ -85,6 +88,9 @@ void setup(void)
   delay(100);
   Serial.begin(115200);
   WIFIC_init();
+#ifdef USE_WEBSOCKETS
+  WS_init();
+#endif
   HTTP_SERVER_init();
   LCD_init();
   NTPS_init();
@@ -94,6 +100,9 @@ void setup(void)
 
 void loop(void){
   HTTP_SERVER_process();
+#ifdef USE_WEBSOCKETS
+  WS_process();
+#endif
   GPIO_process();
   LCD_process();
   WIFIC_process();
@@ -103,6 +112,26 @@ void loop(void){
   if(WIFIC_stationConnected() && !showImage){
     NTPS_process();
   }
+
+#ifdef USE_WEBSOCKETS
+  // Push the time to web clients (gallery clock tile) once per second.
+  static int wsLastSec = -1;
+  if(NTPS_hasSynced()){
+    int sec = NTPS_getSeconds();
+    if(sec != wsLastSec){
+      wsLastSec = sec;
+      String t = NTPS_getHH() + "|" + NTPS_getMM() + "|" + String(sec) + "|" + NTPS_getDate();
+      WS_ServerBroadcast("{\"TIME\":\"" + t + "\"}");
+    }
+  }
+  // Push the active display to web clients whenever it changes.
+  static String wsLastDisp = "";
+  String disp = MAIN_getDisplay();
+  if(disp != wsLastDisp){
+    wsLastDisp = disp;
+    WS_ServerBroadcast("{\"DISP\":\"" + disp + "\"}");
+  }
+#endif
 
   // State machine
   switch(state){
