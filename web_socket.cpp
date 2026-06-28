@@ -1,6 +1,7 @@
 #include <ArduinoJson.h>
 #include <WebSocketsServer.h>
 #include "wifi_connection.h"
+#include "esp32_clock_face.h"
 
 WebSocketsServer wsServer = WebSocketsServer(81);
 
@@ -28,6 +29,10 @@ static void serverEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t le
       if(root.containsKey("APLIST")){
         String APList = "{\"APLIST\":\"" + WIFIC_getApList() + "\"}";
         wsServer.sendTXT(num, APList);
+      }
+
+      if(root.containsKey("GETDISP")){
+        wsServer.sendTXT(num, "{\"DISP\":\"" + MAIN_getDisplay() + "\"}");
       }
     }
   }   

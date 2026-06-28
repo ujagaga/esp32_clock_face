@@ -21,5 +21,6 @@ extern bool SDIMG_writeChunk(const uint8_t* buf, size_t len);
 extern bool SDIMG_writeEnd(void);
 extern void SDIMG_writeAbort(void);
 extern String SDIMG_lastError(void);       // reason the last upload failed
+extern bool SDIMG_delete(String name);     // remove the named file from SD
 
 #endif

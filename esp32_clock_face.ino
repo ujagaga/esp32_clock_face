@@ -101,7 +101,26 @@ void loop(void){
   LCD_process();
   if(WIFIC_stationConnected()){
     NTPS_process();
-  } 
+  }
+
+  // Push the time to web clients (gallery clock tile) once per second.
+  static int wsLastSec = -1;
+  if(NTPS_hasSynced()){
+    int sec = NTPS_getSeconds();
+    if(sec != wsLastSec){
+      wsLastSec = sec;
+      String t = NTPS_getHH() + "|" + NTPS_getMM() + "|" + String(sec) + "|" + NTPS_getDate();
+      WS_ServerBroadcast("{\"TIME\":\"" + t + "\"}");
+    }
+  }
+
+  // Push the active display to web clients whenever it changes.
+  static String wsLastDisp = "";
+  String disp = MAIN_getDisplay();
+  if(disp != wsLastDisp){
+    wsLastDisp = disp;
+    WS_ServerBroadcast("{\"DISP\":\"" + disp + "\"}");
+  }
 
   // State machine
   switch(state){

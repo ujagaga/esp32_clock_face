@@ -208,6 +208,20 @@ bool SDIMG_writeEnd(void){
   return sizeOk;
 }
 
+bool SDIMG_delete(String name){
+  if(!cardReady){
+    return false;
+  }
+  String path = sanitizeName(name);
+  if(path.length() == 0){
+    return false;
+  }
+  LCD_busRelease();
+  bool ok = SD.exists(path) && SD.remove(path);
+  LCD_busAcquire();
+  return ok;
+}
+
 void SDIMG_writeAbort(void){
   if(uploadFile){
     uploadFile.close();
