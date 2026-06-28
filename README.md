@@ -115,14 +115,25 @@ Base URL is the device IP (port 80). Most endpoints are **HTTP GET**; image
 upload is **POST**. Action endpoints return `OK` (or `400` on bad input); list
 endpoints return a `|`-separated string.
 
+### Automation API
+
+Stable `/api/*` endpoints, intended for scripts and home automation.
+
 | Endpoint | Description | Example |
 |---|---|---|
-| `GET /setled?c=RRGGBB` | Set RGB LED color (6 hex digits) | `/setled?c=00ff00` |
-| `GET /setbl?v=N` | Backlight brightness, `N` = 0..100 (maps to 0..50% hardware duty) | `/setbl?v=30` |
-| `GET /flashbl` | Flash backlight to 100% for 500 ms, then restore | `/flashbl` |
-| `GET /flipscreen` | Rotate the screen 180 degrees | `/flipscreen` |
-| `GET /setdisplay?img=NAME` | Show SD image `NAME`, or `clock` for the clock | `/setdisplay?img=eyes1.bin` |
-| `GET /imagelist` | List `*.bin` images on the SD card | `eyes1.bin\|logo.bin` |
+| `GET /api/setled?c=RRGGBB` | Set RGB LED color (6 hex digits) | `/api/setled?c=00ff00` |
+| `GET /api/setbl?v=N` | Backlight brightness, `N` = 0..100 (maps to 0..50% hardware duty) | `/api/setbl?v=30` |
+| `GET /api/flashbl` | Flash backlight to 100% for 500 ms, then restore | `/api/flashbl` |
+| `GET /api/flipscreen` | Rotate the screen 180 degrees | `/api/flipscreen` |
+| `GET /api/setdisplay?img=NAME` | Show SD image `NAME`, or `clock` for the clock | `/api/setdisplay?img=eyes1.bin` |
+| `GET /api/imagelist` | List `*.bin` images on the SD card | `eyes1.bin\|logo.bin` |
+
+### Web UI & config
+
+Used by the built-in web pages; not part of the automation surface.
+
+| Endpoint | Description | Example |
+|---|---|---|
 | `GET /getimage?name=NAME` | Raw RGB565 bytes of an image (used by the gallery) | `/getimage?name=eyes1.bin` |
 | `POST /upload` | Upload an image (multipart, raw RGB565 `.bin`, must be 320x172) | |
 | `GET /delete?name=NAME` | Delete an image from the SD card | `/delete?name=eyes1.bin` |
@@ -132,6 +143,7 @@ endpoints return a `|`-separated string.
 | `GET /wifisave?s=SSID&p=PASS` | Save WiFi credentials and switch to station mode | `/wifisave?s=Home&p=secret` |
 | `GET /` | Main web page | |
 | `GET /selectap` | WiFi configuration page (starts an async scan on load) | |
+| `GET /api` | API documentation page | |
 
 WiFi scanning is non-blocking: serving `/selectap` kicks off a scan, and the page
 fetches `/aplist` ~10 s later to populate the list (with a couple of retries).
@@ -139,8 +151,8 @@ fetches `/aplist` ~10 s later to populate the list (with a couple of retries).
 Example:
 
 ```bash
-curl "http://192.168.4.1/setled?c=ff0000"
-curl "http://192.168.4.1/imagelist"
+curl "http://192.168.4.1/api/setled?c=ff0000"
+curl "http://192.168.4.1/api/imagelist"
 ```
 
 ## Displaying images from SD
