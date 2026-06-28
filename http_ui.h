@@ -136,18 +136,18 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       });
     }).catch(function(e){ showStatus('Delete error: ' + e.message, 'err'); });
   }
+  // 1-bpp frame (MSB first, 40 bytes/row). Set bits shown white on black.
   function decode(ab, cv){
     var bytes=new Uint8Array(ab);
     var ctx=cv.getContext('2d');
     var img=ctx.createImageData(PV_W, PV_H);
-    var d=img.data, n=PV_W*PV_H;
-    for(var i=0;i<n;i++){
-      var p=(bytes[2*i]<<8)|bytes[2*i+1];      // big-endian RGB565
-      var r5=(p>>11)&0x1f, g6=(p>>5)&0x3f, b5=p&0x1f;
-      d[4*i]  =(r5*255/31)|0;
-      d[4*i+1]=(g6*255/63)|0;
-      d[4*i+2]=(b5*255/31)|0;
-      d[4*i+3]=255;
+    var d=img.data, stride=PV_W>>3;
+    for(var y=0;y<PV_H;y++){
+      for(var x=0;x<PV_W;x++){
+        var bit=(bytes[y*stride+(x>>3)] >> (7-(x&7))) & 1;
+        var o=(y*PV_W+x)*4, v=bit?255:0;
+        d[o]=v; d[o+1]=v; d[o+2]=v; d[o+3]=255;
+      }
     }
     ctx.putImageData(img,0,0);
   }
@@ -167,7 +167,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       var cap=document.createElement('figcaption');
       cap.textContent=name;
       var del=document.createElement('button');
-      del.textContent='X';   
+      del.textContent='X';
       del.className='del';
       del.title='Delete';
       del.onclick=function(){ deleteImg(name); };
@@ -236,7 +236,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       loadOne(names, 0);
     });
   }
-  // Resize+crop one file to PV_W x PV_H, pack big-endian RGB565, POST to /upload.
+  // Resize+crop one file to PV_W x PV_H, threshold to 1-bpp, POST to /upload.
   // Resolves true on success, false on failure (never rejects).
   function uploadOne(file, label){
     return new Promise(function(resolve){
@@ -252,16 +252,18 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
         var dw=im.width*s, dh=im.height*s;
         ctx.drawImage(im, (PV_W-dw)/2, (PV_H-dh)/2, dw, dh);
         var d=ctx.getImageData(0,0,PV_W,PV_H).data;
-        var n=PV_W*PV_H, out=new Uint8Array(n*2);
-        for(var i=0;i<n;i++){
-          var r=d[4*i], g=d[4*i+1], b=d[4*i+2];
-          var p=((r&0xf8)<<8)|((g&0xfc)<<3)|(b>>3);
-          out[2*i]=(p>>8)&0xff;        // big-endian
-          out[2*i+1]=p&0xff;
+        // luminance threshold -> 1 bit/pixel, MSB first, 40 bytes/row
+        var stride=PV_W>>3, out=new Uint8Array(stride*PV_H);
+        for(var y=0;y<PV_H;y++){
+          for(var x=0;x<PV_W;x++){
+            var o=(y*PV_W+x)*4;
+            var lum=d[o]*0.299+d[o+1]*0.587+d[o+2]*0.114;
+            if(lum>128){ out[y*stride+(x>>3)] |= (0x80>>(x&7)); }
+          }
         }
-        // strip extension, force .bin
-        var base=file.name.replace(/\.[^.]+$/,'').replace(/[^A-Za-z0-9_-]/g,'_').substring(0,28);
-        var fname=base+'.bin';
+        // strip extension, force .1bpp
+        var base=file.name.replace(/\.[^.]+$/,'').replace(/[^A-Za-z0-9_-]/g,'_').substring(0,26);
+        var fname=base+'.1bpp';
         var fd=new FormData();
         fd.append('f', new Blob([out], {type:'application/octet-stream'}), fname);
         showStatus(label + 'uploading ' + fname + '...', 'info');
@@ -409,17 +411,17 @@ static const char API_HTML_1[] PROGMEM = R"(
     <tr><td class="m">GET</td><td><code>/api/setbl?v=N</code></td><td>Backlight brightness, N = 0..100 (0..50% duty)</td></tr>
     <tr><td class="m">GET</td><td><code>/api/flashbl</code></td><td>Flash backlight to 100% for 500 ms</td></tr>
     <tr><td class="m">GET</td><td><code>/api/flipscreen</code></td><td>Rotate the screen 180&deg;</td></tr>
-    <tr><td class="m">GET</td><td><code>/api/setdisplay?img=NAME</code></td><td>Show SD image NAME, or <code>clock</code></td></tr>
-    <tr><td class="m">GET</td><td><code>/api/imagelist</code></td><td>List *.bin images (| separated)</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/setdisplay?img=NAME</code></td><td>Show uploaded image NAME, or <code>clock</code></td></tr>
+    <tr><td class="m">GET</td><td><code>/api/imagelist</code></td><td>List uploaded images (| separated)</td></tr>
   </table>
 
   <h2>Web UI &amp; config</h2>
   <p class="sub">Used by the built-in web pages; not part of the automation surface.</p>
   <table>
     <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
-    <tr><td class="m">GET</td><td><code>/getimage?name=NAME</code></td><td>Raw RGB565 bytes of an image</td></tr>
-    <tr><td class="m">POST</td><td><code>/upload</code></td><td>Upload image (multipart, RGB565, 320x172)</td></tr>
-    <tr><td class="m">GET</td><td><code>/delete?name=NAME</code></td><td>Delete an image from the SD card</td></tr>
+    <tr><td class="m">GET</td><td><code>/getimage?name=NAME</code></td><td>Raw 1-bpp bytes of an image</td></tr>
+    <tr><td class="m">POST</td><td><code>/upload</code></td><td>Upload a 1-bpp frame to flash (multipart, 320x172, 6880 bytes)</td></tr>
+    <tr><td class="m">GET</td><td><code>/delete?name=NAME</code></td><td>Delete an uploaded image from flash</td></tr>
     <tr><td class="m">GET</td><td><code>/getdisplay</code></td><td>Active display name (clock or image)</td></tr>
     <tr><td class="m">GET</td><td><code>/gettime</code></td><td>Time HH|MM|SS|DD.MM (empty until NTP-synced)</td></tr>
     <tr><td class="m">GET</td><td><code>/aplist</code></td><td>Last WiFi scan result (empty until ready)</td></tr>

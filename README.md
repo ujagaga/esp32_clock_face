@@ -1,15 +1,16 @@
 # ESP32-C6 WiFi Clock
 
 A WiFi-connected NTP clock for the **Waveshare ESP32-C6-LCD-1.47** board. Shows
-the time on the built-in LCD, or a still image loaded from a microSD card. The
-onboard RGB LED, screen brightness, orientation and display mode are all
-controllable from a built-in web page and a matching HTTP API.
+the time on the built-in LCD, or a 1-bit monochrome image uploaded to on-chip
+flash, drawn in the current LED colour. No SD card. The onboard RGB LED, screen
+brightness, orientation and display mode are all controllable from a built-in
+web page and a matching HTTP API.
 
 The web page shows a dark-themed gallery: a clock tile plus a thumbnail of every
-image on the SD card, rendered in the browser. Tap a thumbnail to display it on
-the LCD (the active item is highlighted), delete one with the ✕ overlay, or
-upload a new image straight from the browser — it is resized, cropped and
-converted to RGB565 client-side, then streamed to the card. The page reads its
+uploaded image, rendered in the browser. Tap a thumbnail to display it on the
+LCD (the active item is highlighted), delete one with the ✕ overlay, or upload a
+new image straight from the browser: it is resized, cropped and thresholded to a
+1-bpp frame client-side, then stored in flash (LittleFS). The page reads its
 state (time, active display) once on load; **reload to refresh** it.
 
 > **Branch note:** the `esp32-c6-websockets` branch implements the same features
@@ -28,12 +29,8 @@ state (time, active display) once on load; **reload to refresh** it.
 | LCD | ST7789, 1.47" IPS, 172x320 (used in 320x172 landscape) | MOSI 6, SCLK 7, CS 14, DC 15, RST 21, BL 22 |
 | RGB LED | Single WS2812 (addressable) | 8 |
 | Button | Onboard BOOT button (active low) | 9 |
-| microSD | TF card slot, shares the LCD SPI bus | MISO 5, MOSI 6, SCLK 7, CS 4 |
 
-The microSD card and the LCD share one SPI bus. Because of an ESP32-C6 quirk
-(`SPI.setDataMode()`/`setFrequency()` don't latch to hardware, but the SD
-library's transactions do), the LCD's SPI config is re-latched via a
-`beginTransaction()` pair after every SD access — see `ST7789_Custom::busAcquire()`.
+Images live in on-chip flash (LittleFS), so no microSD card is used.
 
 ### Behaviour
 
@@ -52,8 +49,6 @@ library's transactions do), the LCD's SPI config is re-latched via a
 ## Software requirements
 
 - **ESP32 Arduino core 3.3.10** (board: `esp32:esp32:esp32c6`).
-- A microSD card formatted **FAT32** (MBR partition table; exFAT is not
-  supported by the Arduino `SD` library).
 
 ### Libraries to install (Library Manager)
 
@@ -67,8 +62,8 @@ library's transactions do), the LCD's SPI config is re-latched via a
 | ArduinoJson | JSON parsing/serialization for the TCP API |
 | Adafruit ST7789 | *optional* — only if you enable `USE_ADAFRUIT_ST7789` in `config.h` |
 
-Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`, `SD`,
-`SPI`, `EEPROM`, `WiFiUdp`.
+Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`,
+`LittleFS`, `SPI`, `EEPROM`, `WiFiUdp`.
 
 By default the project uses the bundled custom driver `ST7789_Custom.h`, which
 handles the 172x320 panel offset and the remappable C6 SPI pins. Define
@@ -133,8 +128,8 @@ Stable `/api/*` endpoints, intended for scripts and home automation.
 | `GET /api/setbl?v=N` | Backlight brightness, `N` = 0..100 (maps to 0..50% hardware duty) | `/api/setbl?v=30` |
 | `GET /api/flashbl` | Flash backlight to 100% for 500 ms, then restore | `/api/flashbl` |
 | `GET /api/flipscreen` | Rotate the screen 180 degrees | `/api/flipscreen` |
-| `GET /api/setdisplay?img=NAME` | Show SD image `NAME`, or `clock` for the clock | `/api/setdisplay?img=eyes1.bin` |
-| `GET /api/imagelist` | List `*.bin` images on the SD card | `eyes1.bin\|logo.bin` |
+| `GET /api/setdisplay?img=NAME` | Show uploaded image `NAME`, or `clock` | `/api/setdisplay?img=logo.1bpp` |
+| `GET /api/imagelist` | List uploaded images | `logo.1bpp\|cat.1bpp` |
 
 ### Web UI & config
 
@@ -142,9 +137,9 @@ Used by the built-in web pages; not part of the automation surface.
 
 | Endpoint | Description | Example |
 |---|---|---|
-| `GET /getimage?name=NAME` | Raw RGB565 bytes of an image (used by the gallery) | `/getimage?name=eyes1.bin` |
-| `POST /upload` | Upload an image (multipart, raw RGB565 `.bin`, must be 320x172) | |
-| `GET /delete?name=NAME` | Delete an image from the SD card | `/delete?name=eyes1.bin` |
+| `GET /getimage?name=NAME` | Raw 1-bpp bytes of an image (used by the gallery) | `/getimage?name=logo.1bpp` |
+| `POST /upload` | Upload a 1-bpp frame to flash (multipart, 320x172, 6880 bytes) | |
+| `GET /delete?name=NAME` | Delete an uploaded image from flash | `/delete?name=logo.1bpp` |
 | `GET /getdisplay` | Active display name (`clock` or an image) | `eyes1.bin` |
 | `GET /gettime` | Current time `HH\|MM\|SS\|DD.MM` (empty until NTP-synced) | `14\|05\|23\|28.06` |
 | `GET /aplist` | Result of the last WiFi scan (empty until ready) | `Home\|Office` |
@@ -171,9 +166,9 @@ the device replies with one JSON object per line. One client at a time.
 
 | Command | Reply |
 |---|---|
-| `{"cmd":"list"}` | `{"images":"eyes1.bin\|eyes2.bin"}` |
+| `{"cmd":"list"}` | `{"images":"logo.1bpp\|cat.1bpp"}` |
 | `{"cmd":"getdisplay"}` | `{"display":"clock"}` |
-| `{"cmd":"setdisplay","img":"eyes1.bin"}` | `{"ok":true}` (use `"clock"` or omit `img` for the clock) |
+| `{"cmd":"setdisplay","img":"logo.1bpp"}` | `{"ok":true}` (use `"clock"` or omit `img` for the clock) |
 | `{"cmd":"gettime"}` | `{"time":"HH\|MM\|SS\|DD.MM"}` (empty until NTP-synced) |
 | `{"cmd":"setled","c":"00ff00"}` | `{"ok":true}` (6 hex digits) |
 | `{"cmd":"setbl","v":50}` | `{"ok":true}` (0..100) |
@@ -182,33 +177,35 @@ the device replies with one JSON object per line. One client at a time.
 | `{"cmd":"httpserver","enable":false}` | `{"ok":true,"running":false}` — stop the HTTP server to save CPU; **refused** (`{"ok":false,"error":"http client connected","running":true}`) while a browser is connected. `"enable":true` restarts it; omit `enable` to just query `{"running":bool}`. |
 
 ```bash
-printf '{"cmd":"list"}\n'                       | nc 192.168.4.1 333
-printf '{"cmd":"setdisplay","img":"eyes1.bin"}\n' | nc 192.168.4.1 333
-printf '{"cmd":"httpserver","enable":false}\n'   | nc 192.168.4.1 333
+printf '{"cmd":"list"}\n'                    | nc 192.168.4.1 333
+printf '{"cmd":"setdisplay","img":"logo.1bpp"}\n' | nc 192.168.4.1 333
+printf '{"cmd":"httpserver","enable":false}\n' | nc 192.168.4.1 333
 ```
 
 Or use the bundled Python client (`tools/tcp_api.py`):
 
 ```bash
 tools/tcp_api.py 192.168.4.1 list
-tools/tcp_api.py 192.168.4.1 setdisplay eyes1.bin
+tools/tcp_api.py 192.168.4.1 setdisplay logo.1bpp
 tools/tcp_api.py 192.168.4.1 setled 00ff00
 tools/tcp_api.py 192.168.4.1 httpserver off
 ```
 
-## Displaying images from SD
+## Images
 
-Images are stored as raw **RGB565, big-endian**, sized to the screen
-(**320x172** landscape), with a `.bin` extension, in the SD card root.
+Everything shown (other than the clock) is a full-screen **320x172 1-bit
+monochrome** frame, drawn in the current LED colour on black, stored in on-chip
+flash (LittleFS). Each frame is exactly `320 * 172 / 8 = 6880` bytes; the ~1 MB
+filesystem holds ~150 of them.
 
-Upload them straight from the web page: click **Upload images**, select one or
-more files, and the browser resizes/crops each to 320x172, converts it to RGB565
-and sends them to the card one at a time. They then appear in the gallery and in
-`/imagelist`. Delete any image from the gallery with its ✕ overlay button.
+Upload from the web page: click **Upload images**, pick one or more files, and
+the browser scales/crops each to 320x172, thresholds it to 1-bpp and stores it
+in flash (extension forced to `.1bpp`). They appear in the gallery and in
+`/api/imagelist`. Delete one with its ✕ overlay.
 
-> **Note:** All images are same file size, so deleting an image frees its clusters in the FAT, and the next upload
-> reuses that free space — deleting and re-uploading churns the same space, no
-> leak or manual cleanup needed.
+The LED colour doubles as the image colour — set it from the web page or
+`/api/setled`. If the LED is off (black), images fall back to white so they stay
+visible.
 
 ## Scripts (`tools/`)
 
@@ -217,6 +214,6 @@ and sends them to the card one at a time. They then appear in the gallery and in
 | `build.sh` | Compile (and optionally `upload`) the firmware with arduino-cli. Honors `FQBN` and `PORT` env vars. |
 | `tcp_api.py` | Command-line client for the JSON-over-TCP API (`tcp_api.py <host> <command>`; `-h` for the command list). |
 
-Image conversion is done in the browser at upload time (see *Displaying images
-from SD*), so no offline conversion script is needed.
+Image conversion for uploads is done in the browser, so no offline conversion
+script is needed.
 

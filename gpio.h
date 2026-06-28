@@ -18,6 +18,7 @@ extern void GPIO_init(void);
 extern void GPIO_process(void);              // poll button, call from loop()
 extern void GPIO_setLedColor(uint8_t r, uint8_t g, uint8_t b);
 extern void GPIO_setLedHex(uint32_t rgb);    // 0x00RRGGBB
+extern uint32_t GPIO_getLedHex(void);        // last colour set, 0x00RRGGBB
 extern void GPIO_setLedOff(void);
 
 #endif

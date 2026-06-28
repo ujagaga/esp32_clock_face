@@ -182,9 +182,8 @@ void LCD_rotate180(void){
 }
 
 // --- Shared SPI bus + raw image blit ---
-// The microSD card shares the LCD's SPI bus. These wrappers let sd_images.cpp
-// release the bus for SD reads and push raw RGB565 pixels to the panel. The
-// GRAM pointer auto-increments, so reads and pixel pushes can interleave.
+// Bus + raw blit wrappers used by images.cpp to stream pixel rows to the panel.
+// The GRAM pointer auto-increments, so successive row pushes fill the screen.
 void LCD_busRelease(void){
 #ifdef USE_ADAFRUIT_ST7789
   tft.endWrite();

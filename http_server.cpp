@@ -11,7 +11,7 @@
 #include "esp32_clock_face.h"
 #include "gpio.h"
 #include "lcd_display.h"
-#include "sd_images.h"
+#include "images.h"
 #include "NTPSync.h"
 #include "http_ui.h"
 
@@ -144,20 +144,21 @@ static void setDisplay(void){
 }
 
 static void imageList(void){
-  webServer->send(200, "text/plain", SDIMG_list());
+  webServer->send(200, "text/plain", IMG_list());
 }
 
 static void getImage(void){
   String name = webServer->arg("name");
-  if(name.length() == 0 || !SDIMG_sendRaw(name, webServer)){
+  if(name.length() == 0 || !IMG_sendRaw(name, webServer)){
     webServer->send(404, "text/plain", "Image not found");
   }
 }
 
 static void deleteImage(void){
   String name = webServer->arg("name");
-  if(name.length() == 0 || !SDIMG_delete(name)){
-    webServer->send(400, "text/plain", "Delete failed");
+  if(name.length() == 0 || !IMG_delete(name)){
+    String err = IMG_lastError();
+    webServer->send(400, "text/plain", err.length() ? err : "Delete failed");
     return;
   }
   if(MAIN_getDisplay() == name){
@@ -168,23 +169,23 @@ static void deleteImage(void){
 
 static bool uploadOk = false;
 
-// Streams a multipart file upload straight to the SD card, chunk by chunk.
+// Streams a multipart 1-bpp frame upload straight to LittleFS, chunk by chunk.
 static void uploadImage(void){
   HTTPUpload& up = webServer->upload();
   if(up.status == UPLOAD_FILE_START){
-    uploadOk = SDIMG_writeBegin(up.filename);
+    uploadOk = IMG_writeBegin(up.filename);
   }else if(up.status == UPLOAD_FILE_WRITE){
     if(uploadOk){
-      uploadOk = SDIMG_writeChunk(up.buf, up.currentSize);
+      uploadOk = IMG_writeChunk(up.buf, up.currentSize);
     }
   }else if(up.status == UPLOAD_FILE_END){
     if(uploadOk){
-      uploadOk = SDIMG_writeEnd();
+      uploadOk = IMG_writeEnd();
     }else{
-      SDIMG_writeAbort();   // a chunk failed: close file, reacquire LCD bus
+      IMG_writeAbort();   // a chunk failed: close + remove the partial file
     }
   }else{
-    SDIMG_writeAbort();
+    IMG_writeAbort();
     uploadOk = false;
   }
 }
@@ -193,7 +194,7 @@ static void uploadDone(void){
   if(uploadOk){
     webServer->send(200, "text/plain", "OK");
   }else{
-    String err = SDIMG_lastError();
+    String err = IMG_lastError();
     if(err.length() == 0){
       err = "Upload failed";
     }

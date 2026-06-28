@@ -30,14 +30,22 @@ void GPIO_process(void)
   }
 }
 
+static uint32_t lastColor = 0;   // last colour set, 0x00RRGGBB
+
 void GPIO_setLedColor(uint8_t r, uint8_t g, uint8_t b)
 {
+  lastColor = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
   neopixelWrite(RGB_LED_PIN, g, r, b);
 }
 
 void GPIO_setLedHex(uint32_t rgb)
 {
   GPIO_setLedColor((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+}
+
+uint32_t GPIO_getLedHex(void)
+{
+  return lastColor;
 }
 
 void GPIO_setLedOff(void)

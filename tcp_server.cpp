@@ -15,7 +15,7 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "tcp_server.h"
-#include "sd_images.h"
+#include "images.h"
 #include "esp32_clock_face.h"
 #include "gpio.h"
 #include "lcd_display.h"
@@ -42,7 +42,7 @@ static void handleLine(const String& line){
     String cmd = doc["cmd"] | "";
 
     if(cmd == "list"){
-      res["images"] = SDIMG_list();
+      res["images"] = IMG_list();
 
     }else if(cmd == "getdisplay"){
       res["display"] = MAIN_getDisplay();

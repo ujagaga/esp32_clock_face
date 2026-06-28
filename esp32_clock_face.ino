@@ -4,7 +4,7 @@
 #include "NTPSync.h"
 #include "lcd_display.h"
 #include "gpio.h"
-#include "sd_images.h"
+#include "images.h"
 #include "tcp_server.h"
 
 enum Operation {
@@ -91,7 +91,7 @@ void setup(void)
   LCD_init();
   NTPS_init();
   GPIO_init();
-  SDIMG_init();
+  IMG_init();
 }
 
 void loop(void){
@@ -153,7 +153,7 @@ void loop(void){
     {
       if(showImage){
         if(displayDirty){
-          SDIMG_show(currentImage);
+          IMG_show(currentImage);
           displayDirty = false;
         }
         break;
