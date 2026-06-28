@@ -117,6 +117,10 @@ Base URL is the device IP (port 80). Most endpoints are **HTTP GET**; image
 upload is **POST**. Action endpoints return `OK` (or `400` on bad input); list
 endpoints return a `|`-separated string.
 
+### Automation API
+
+Stable `/api/*` endpoints, intended for scripts and home automation.
+
 | Endpoint | Description | Example |
 |---|---|---|
 | `GET /api/setled?c=RRGGBB` | Set RGB LED color (6 hex digits) | `/api/setled?c=00ff00` |
@@ -125,6 +129,13 @@ endpoints return a `|`-separated string.
 | `GET /api/flipscreen` | Rotate the screen 180 degrees | `/api/flipscreen` |
 | `GET /api/setdisplay?img=NAME` | Show SD image `NAME`, or `clock` for the clock | `/api/setdisplay?img=eyes1.bin` |
 | `GET /api/imagelist` | List `*.bin` images on the SD card | `eyes1.bin\|logo.bin` |
+
+### Web UI & config
+
+Used by the built-in web pages; not part of the automation surface.
+
+| Endpoint | Description | Example |
+|---|---|---|
 | `GET /getimage?name=NAME` | Raw RGB565 bytes of an image (used by the gallery) | `/getimage?name=eyes1.bin` |
 | `POST /upload` | Upload an image (multipart, raw RGB565 `.bin`, must be 320x172) | |
 | `GET /delete?name=NAME` | Delete an image from the SD card | `/delete?name=eyes1.bin` |
@@ -132,10 +143,13 @@ endpoints return a `|`-separated string.
 | `GET /wifisave?s=SSID&p=PASS` | Save WiFi credentials and switch to station mode | `/wifisave?s=Home&p=secret` |
 | `GET /` | Main web page | |
 | `GET /selectap` | WiFi configuration page | |
+| `GET /api` | API documentation page | |
 
-The WebSocket server (port 81) carries: `{"APLIST":""}` → network list,
-`{"GETDISP":""}` → current display name, and server-pushed `{"TIME":"HH|MM|SS|DD.MM"}`
-(once per second) and `{"DISP":"name"}` (on change).
+### WebSocket (port 81)
+
+Carries: `{"APLIST":""}` → network list, `{"GETDISP":""}` → current display name,
+and server-pushed `{"TIME":"HH|MM|SS|DD.MM"}` (once per second) and
+`{"DISP":"name"}` (on change).
 
 Example:
 
