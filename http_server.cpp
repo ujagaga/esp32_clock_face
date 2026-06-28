@@ -13,11 +13,7 @@
 #include "lcd_display.h"
 #include "sd_images.h"
 #include "NTPSync.h"
-#ifdef USE_WEBSOCKETS
-#include "http_ui_ws.h"
-#else
 #include "http_ui.h"
-#endif
 
 // --- Web server object ---
 WebServer* webServer = nullptr;
@@ -30,8 +26,9 @@ void showStartPage() {
   response += "<h1>WiFi Clock</h1>";
   response += "<p class='ip'>Station IP: " + WIFIC_getStationIp() + "</p>";
   response += FPSTR(INDEX_HTML_1);
+  response += FPSTR(INDEX_HTML_2);   // transport-specific update mechanism + </script>
   response += FPSTR(HTML_END);
-  webServer->send(200, "text/html", response);  
+  webServer->send(200, "text/html", response);
 }
 
 
@@ -39,7 +36,8 @@ static void showApiPage(void){
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(API_HTML_0);
   response += FPSTR(NAV_HTML);
-  response += FPSTR(API_HTML_1);
+  response += FPSTR(API_HTML_1_HEAD);
+  response += FPSTR(API_HTML_1_TAIL);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);
 }

@@ -19,11 +19,11 @@ Define `USE_WEBSOCKETS` in `config.h` to switch the web UI to a WebSocket (port
 browser (no reload). The trade-off is higher CPU/RAM use from the persistent
 connection and per-second pushes, plus two extra libraries
 (**WebSockets**, **ArduinoJson**) — so leave it off if you add CPU-heavy
-features. The two modes share all the same page styling; only the data transport
-differs (`http_ui.h` for load-time fetches, `http_ui_ws.h` for WebSocket).
+features. Both modes live in `http_ui.h` and share all the same page styling;
+only the transport-dependent fragments are switched by the flag.
 
-> **Branch note:** `esp32-c6-no-ws` archives the original no-WebSocket-only code,
-> and `esp32-c6-websockets` archives the WebSocket-only version. On `main` the two
+> **Branch note:** `esp32-c6-no-ws` archives the original no-WebSocket code,
+> and `esp32-c6-websockets` archives the WebSocket version. On `main` the two
 > are merged and selected with the `USE_WEBSOCKETS` flag above.
 
 ## Hardware

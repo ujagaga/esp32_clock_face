@@ -4,9 +4,15 @@
 /*
  *  Static HTML/CSS/JS page templates served by http_server.cpp.
  *  Kept here to keep the request handlers readable.
+ *
+ *  The page markup/styling is shared. Only the bits that depend on the data
+ *  transport are guarded by USE_WEBSOCKETS (see config.h): the home-page update
+ *  mechanism (INDEX_HTML_2), the WiFi-scan script (APLIST_HTML_2) and the API
+ *  docs tables (API_HTML_1).
  */
 
 #include <pgmspace.h>
+#include "config.h"
 
 static const char HTML_BEGIN[] PROGMEM = R"(
 <!DOCTYPE HTML>
@@ -72,6 +78,8 @@ static const char INDEX_HTML_0[] PROGMEM = R"(
   <div class="center_div">
 )";
 
+// Home page markup + the transport-independent JS. The update mechanism
+// (startUpdates) is supplied by INDEX_HTML_2 below, which closes the <script>.
 static const char INDEX_HTML_1[] PROGMEM = R"(
   <div class="card">
     <div class="row">
@@ -167,7 +175,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       var cap=document.createElement('figcaption');
       cap.textContent=name;
       var del=document.createElement('button');
-      del.textContent='X';   
+      del.textContent='×';
       del.className='del';
       del.title='Delete';
       del.onclick=function(){ deleteImg(name); };
@@ -179,7 +187,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       loadOne(names, idx+1);     // next image only after this one finishes
     });
   }
-  // Mirror of the LCD clock face. Drawn once per page load (reload to refresh).
+  // Mirror of the LCD clock face. hh===null shows a placeholder.
   var clockCanvas=null;
   var curDisp='clock';
   function drawClock(hh, mm, ss, date){
@@ -201,20 +209,6 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     ctx.font='bold 30px monospace';
     ctx.fillText(date, PV_W/2, PV_H/2+50);
   }
-  // Fetch the time once and draw the clock tile.
-  function refreshClock(){
-    fetch('/gettime').then(function(r){return r.text();}).then(function(t){
-      var p=t.split('|');
-      if(p.length<4){ drawClock(null); }
-      else{ drawClock(p[0], p[1], parseInt(p[2],10), p[3]); }
-    }).catch(function(){ drawClock(null); });
-  }
-  // Fetch the active display once and highlight the matching tile.
-  function refreshDisplay(){
-    fetch('/getdisplay').then(function(r){return r.text();}).then(function(v){
-      curDisp=v; markSel(v);
-    }).catch(function(){});
-  }
   function addClockTile(){
     var fig=document.createElement('figure');
     fig.dataset.name='clock';
@@ -227,7 +221,6 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     document.getElementById('gal').appendChild(fig);
     drawClock(null);
     markSel(curDisp);
-    refreshClock();
   }
   function buildGallery(){
     addClockTile();
@@ -295,10 +288,43 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
   }
   function setLed(v){ fetch('/api/setled?c=' + v.substring(1)); }
   function setBl(v){ fetch('/api/setbl?v=' + v); }
-  refreshDisplay();   // learn the active display, then build the gallery
   buildGallery();
+  startUpdates();   // mechanism defined per transport in INDEX_HTML_2
+)";
+
+#ifdef USE_WEBSOCKETS
+// Live updates: time + active display pushed by the device over a WebSocket.
+static const char INDEX_HTML_2[] PROGMEM = R"WS(
+  function startUpdates(){
+    var ws=new WebSocket('ws://'+location.hostname+':81/');
+    ws.onopen=function(){ ws.send('{"GETDISP":""}'); };   // ask for current display
+    ws.onmessage=function(e){
+      var d; try{ d=JSON.parse(e.data); }catch(_){ return; }
+      if(d.hasOwnProperty('TIME')){
+        var p=d.TIME.split('|');
+        if(p.length<4){ drawClock(null); } else { drawClock(p[0], p[1], parseInt(p[2],10), p[3]); }
+      }
+      if(d.hasOwnProperty('DISP')){ curDisp=d.DISP; markSel(d.DISP); }
+    };
+    ws.onclose=function(){ setTimeout(startUpdates, 3000); };   // auto-reconnect
+  }
+</script>
+)WS";
+#else
+// Lightweight: read time + active display once on load (reload to refresh).
+static const char INDEX_HTML_2[] PROGMEM = R"(
+  function startUpdates(){
+    fetch('/getdisplay').then(function(r){return r.text();}).then(function(v){
+      curDisp=v; markSel(v);
+    }).catch(function(){});
+    fetch('/gettime').then(function(r){return r.text();}).then(function(t){
+      var p=t.split('|');
+      if(p.length<4){ drawClock(null); } else { drawClock(p[0], p[1], parseInt(p[2],10), p[3]); }
+    }).catch(function(){ drawClock(null); });
+  }
 </script>
 )";
+#endif
 
 static const char APLIST_HTML_0[] PROGMEM = R"(
 <style>
@@ -323,6 +349,44 @@ static const char APLIST_HTML_1[] PROGMEM = R"(
       <div id='vm'>
 )";
 
+#ifdef USE_WEBSOCKETS
+static const char APLIST_HTML_2[] PROGMEM = R"(
+      </div>
+      <form method='get' action='wifisave'>
+        <input id='s' name='s' length=32 placeholder='SSID (Leave blank for AP mode)'><br>
+        <input id='p' name='p' length=32 placeholder='Password'><br>
+        <br><button type='submit'>Save</button>
+      </form>
+     </div>
+  </div>
+<script>
+  // The device scans on the WebSocket request and pushes the list back. The
+  // progress bar approximates the scan time; results replace it when they arrive.
+  function c(l){
+    document.getElementById('s').value=l.innerText||l.textContent;
+    document.getElementById('p').focus();
+  }
+  function done(){ document.getElementById('pbar').style.display='none'; }
+  var cn=new WebSocket('ws://'+location.hostname+':81/');
+  cn.onopen=function(){ cn.send('{"APLIST":""}'); };
+  cn.onmessage=function(e){
+    var data; try{ data=JSON.parse(e.data); }catch(_){ return; }
+    if(!data.hasOwnProperty('APLIST')){ return; }
+    done();
+    var list=data.APLIST.split('|').filter(function(s){return s.length>0;});
+    var vm=document.getElementById('vm');
+    if(!list.length){ document.getElementById('ttl').innerHTML='No networks found.'; vm.innerHTML=''; return; }
+    document.getElementById('ttl').innerHTML='Networks found:';
+    var html='';
+    for(var i=0;i<list.length;i++){
+      html+='<span>'+(i+1)+": </span><a href='#p' onclick='c(this)'>" + list[i] + '</a><br>';
+    }
+    vm.innerHTML=html;
+  };
+  setTimeout(function(){ document.getElementById('pfill').style.width='100%'; }, 50); // animate bar
+</script>
+)";
+#else
 static const char APLIST_HTML_2[] PROGMEM = R"(
       </div>
       <form method='get' action='wifisave'>
@@ -363,6 +427,7 @@ static const char APLIST_HTML_2[] PROGMEM = R"(
   setTimeout(function(){ load(3); }, 10000);   // fetch after the bar fills, then retry
 </script>
 )";
+#endif
 
 static const char REDIRECT_HTML[] PROGMEM = R"(
 <p id="tmr"></p>
@@ -397,7 +462,7 @@ static const char API_HTML_0[] PROGMEM = R"(
 <div class="contain"><div class="center_div">
 )";
 
-static const char API_HTML_1[] PROGMEM = R"(
+static const char API_HTML_1_HEAD[] PROGMEM = R"(
   <h1>HTTP API</h1>
   <p class="sub">Device IP, port 80. Action endpoints return <code>OK</code> or <code>400</code>.</p>
 
@@ -420,6 +485,30 @@ static const char API_HTML_1[] PROGMEM = R"(
     <tr><td class="m">GET</td><td><code>/getimage?name=NAME</code></td><td>Raw RGB565 bytes of an image</td></tr>
     <tr><td class="m">POST</td><td><code>/upload</code></td><td>Upload image (multipart, RGB565, 320x172)</td></tr>
     <tr><td class="m">GET</td><td><code>/delete?name=NAME</code></td><td>Delete an image from the SD card</td></tr>
+)";
+
+// Transport-dependent rows + trailer for the "Web UI & config" table.
+#ifdef USE_WEBSOCKETS
+static const char API_HTML_1_TAIL[] PROGMEM = R"(
+    <tr><td class="m">GET</td><td><code>/aplist</code></td><td>Scan and list nearby WiFi networks</td></tr>
+    <tr><td class="m">GET</td><td><code>/wifisave?s=SSID&amp;p=PASS</code></td><td>Save WiFi credentials, switch to station mode</td></tr>
+    <tr><td class="m">GET</td><td><code>/</code></td><td>Main web page</td></tr>
+    <tr><td class="m">GET</td><td><code>/selectap</code></td><td>WiFi configuration page</td></tr>
+    <tr><td class="m">GET</td><td><code>/api</code></td><td>This documentation page</td></tr>
+  </table>
+
+  <h2>WebSocket (port 81)</h2>
+  <table>
+    <tr><th>Direction</th><th>Message</th><th>Description</th></tr>
+    <tr><td>send</td><td><code>{"APLIST":""}</code></td><td>Request a WiFi scan + network list</td></tr>
+    <tr><td>send</td><td><code>{"GETDISP":""}</code></td><td>Request the current display name</td></tr>
+    <tr><td>recv</td><td><code>{"TIME":"HH|MM|SS|DD.MM"}</code></td><td>Pushed once per second</td></tr>
+    <tr><td>recv</td><td><code>{"DISP":"name"}</code></td><td>Pushed when the active display changes</td></tr>
+  </table>
+</div></div>
+)";
+#else
+static const char API_HTML_1_TAIL[] PROGMEM = R"(
     <tr><td class="m">GET</td><td><code>/getdisplay</code></td><td>Active display name (clock or image)</td></tr>
     <tr><td class="m">GET</td><td><code>/gettime</code></td><td>Time HH|MM|SS|DD.MM (empty until NTP-synced)</td></tr>
     <tr><td class="m">GET</td><td><code>/aplist</code></td><td>Last WiFi scan result (empty until ready)</td></tr>
@@ -431,5 +520,6 @@ static const char API_HTML_1[] PROGMEM = R"(
   <p class="sub">The page reads state once on load &mdash; reload to refresh.</p>
 </div></div>
 )";
+#endif
 
 #endif
