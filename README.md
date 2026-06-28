@@ -75,7 +75,9 @@ handles the 172x320 panel offset and the remappable C6 SPI pins. Define
 1. Install the **esp32** boards package (Boards Manager) at version >= 3.3.10.
 2. Install the libraries listed above (Library Manager).
 3. Select board **ESP32C6 Dev Module**.
-4. Open `esp32_clock_face.ino` and Upload.
+4. Set **Tools → Partition Scheme → "Huge APP (3MB No OTA/1MB SPIFFS)"** — the
+   firmware is large and is flashed over serial, so OTA/SPIFFS are not needed.
+5. Open `esp32_clock_face.ino` and Upload.
 
 ### arduino-cli / command line
 
@@ -88,10 +90,11 @@ tools/build.sh            # compile only
 tools/build.sh upload     # compile, then flash
 ```
 
-Overridable via environment:
+`build.sh` defaults to the `huge_app` partition scheme
+(`esp32:esp32:esp32c6:PartitionScheme=huge_app`). Overridable via environment:
 
 ```bash
-FQBN=esp32:esp32:esp32c6 PORT=/dev/ttyACM0 tools/build.sh upload
+FQBN=esp32:esp32:esp32c6:PartitionScheme=huge_app PORT=/dev/ttyACM0 tools/build.sh upload
 ```
 
 ### VS Code (IntelliSense)

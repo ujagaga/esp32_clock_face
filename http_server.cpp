@@ -21,6 +21,8 @@ WebServer* webServer = nullptr;
 void showStartPage() { 
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(INDEX_HTML_0);
+  response += FPSTR(NAV_HTML);
+  response += "<h1>WiFi Clock</h1>";
   response += "<p class='ip'>Station IP: " + WIFIC_getStationIp() + "</p>";
   response += FPSTR(INDEX_HTML_1);
   response += FPSTR(HTML_END);
@@ -30,7 +32,9 @@ void showStartPage() {
 
 static void showApiPage(void){
   String response = FPSTR(HTML_BEGIN);
-  response += FPSTR(API_HTML);
+  response += FPSTR(API_HTML_0);
+  response += FPSTR(NAV_HTML);
+  response += FPSTR(API_HTML_1);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);
 }
@@ -52,10 +56,10 @@ static void showStatusPage(bool goToHome = false) {
 
 static void selectAP(void) {   
   String response = FPSTR(HTML_BEGIN);
-  response += FPSTR(APLIST_HTML_0);  
+  response += FPSTR(APLIST_HTML_0);
+  response += FPSTR(NAV_HTML);
   response += FPSTR(APLIST_HTML_1);
-  response += "Please wait...";  
-  response += FPSTR(APLIST_HTML_2);   
+  response += FPSTR(APLIST_HTML_2);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);  
 }

@@ -26,6 +26,24 @@ static const char HTML_BEGIN[] PROGMEM = R"(
 
 static const char HTML_END[] PROGMEM = "</body></html>";
 
+// Shared top navigation bar. Inserted right after each page's container opens.
+static const char NAV_HTML[] PROGMEM = R"NAV(
+<style>
+  .nav{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1.2rem; }
+  .nav a{ border-radius:.5rem; background:#2a3340; color:#e6e9ef;
+    font-size:.85rem; line-height:1; padding:.5rem .8rem; text-decoration:none; }
+  .nav a:hover{ background:#37424f; }
+  .nav a.active{ background:#ff5a3c; color:#fff; }
+</style>
+<div class="nav">
+  <a href="/">Home</a>
+  <a href="/selectap">WiFi</a>
+  <a href="/api">API docs</a>
+</div>
+<script>(function(){var p=location.pathname,l=document.querySelectorAll('.nav a');
+  for(var i=0;i<l.length;i++){ if(l[i].getAttribute('href')===p){ l[i].className='active'; } }})();</script>
+)NAV";
+
 static const char INDEX_HTML_0[] PROGMEM = R"(
 <style>
   h1{ font-weight:600; font-size:1.7rem; letter-spacing:.5px; margin:0 0 .2rem; text-align:center; }
@@ -52,7 +70,6 @@ static const char INDEX_HTML_0[] PROGMEM = R"(
 </style>
 <div class="contain">
   <div class="center_div">
-  <h1>WiFi Clock</h1>
 )";
 
 static const char INDEX_HTML_1[] PROGMEM = R"(
@@ -68,7 +85,6 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     <div class="btn-row">
       <button class="btn" type="button" onclick="fetch('/flashbl');">Flash</button>
       <button class="btn" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
-      <button class="btn" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
       <label class="btn accent" for="up">Upload images</label>
       <input type="file" id="up" accept="image/*" multiple style="display:none" onchange="uploadFiles(this.files);">
     </div>
@@ -77,7 +93,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     <p class="ghead">Gallery &mdash; tap to display</p>
     <div id="gal"></div>
   </div>
-  <p class="src"><a href='/api'>API docs</a> &middot; <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a></p>
+  <p class="src"><a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a></p>
 </div>
 <div id="status"></div>
 <style>
@@ -151,19 +167,21 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       var cap=document.createElement('figcaption');
       cap.textContent=name;
       var del=document.createElement('button');
-      del.textContent='X';   
+      del.textContent='×';
       del.className='del';
       del.title='Delete';
       del.onclick=function(){ deleteImg(name); };
       fig.appendChild(cv); fig.appendChild(cap); fig.appendChild(del);
       document.getElementById('gal').appendChild(fig);
       decode(ab, cv);
+      markSel(curDisp);   // highlight if this is the active image
     }).catch(function(){}).then(function(){
       loadOne(names, idx+1);     // next image only after this one finishes
     });
   }
-  // Mirror of the LCD clock face, fed by the device's time over WebSocket.
+  // Mirror of the LCD clock face, fed live by the device over WebSocket.
   var clockCanvas=null;
+  var curDisp='clock';
   function drawClock(hh, mm, ss, date){
     if(!clockCanvas){ return; }
     var ctx=clockCanvas.getContext('2d');
@@ -183,7 +201,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     ctx.font='bold 30px monospace';
     ctx.fillText(date, PV_W/2, PV_H/2+50);
   }
-  // Device pushes time and active display over WebSocket (no polling).
+  // Device pushes time and active display over WebSocket (live, no polling).
   function startSocket(){
     var ws=new WebSocket('ws://'+location.hostname+':81/');
     ws.onopen=function(){ ws.send('{"GETDISP":""}'); };  // ask for current display
@@ -194,9 +212,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
         if(p.length<4){ drawClock(null); }
         else{ drawClock(p[0], p[1], parseInt(p[2],10), p[3]); }
       }
-      if(d.hasOwnProperty('DISP')){
-        markSel(d.DISP);
-      }
+      if(d.hasOwnProperty('DISP')){ curDisp=d.DISP; markSel(d.DISP); }
     };
     ws.onclose=function(){ setTimeout(startSocket, 3000); };  // auto-reconnect
   }
@@ -210,7 +226,8 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     cap.textContent='Clock';
     fig.appendChild(clockCanvas); fig.appendChild(cap);
     document.getElementById('gal').appendChild(fig);
-    drawClock(null);   // "Waiting NTP..." until first WS push
+    drawClock(null);
+    markSel(curDisp);
   }
   function buildGallery(){
     addClockTile();
@@ -286,28 +303,29 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
 static const char APLIST_HTML_0[] PROGMEM = R"(
 <style>
   .c{text-align: center;}
-  div,input{padding:5px;font-size:1em;}
-  input{width:95%;}
+  input{width:95%;padding:5px;font-size:1em;text-align:center;}
   body{text-align: left;}
-  button{width:100%;border:0;border-radius:0.3rem;color:#fff;line-height:2.4rem;font-size:1.2rem;height:40px;background-color:#1fa3ec;}
+  button{display:block;margin:1rem auto 0;border:0;border-radius:0.55rem;color:#fff;line-height:1;font-size:1rem;padding:0.6rem 1.6rem;background-color:#ff5a3c;}
+  button:hover{background-color:#ff6f55;}
   .q{float: right;width: 64px;text-align: right;}
   .radio{width:2em;}
   #vm{width:100%;height:50vh;overflow-y:auto;margin-bottom:1em;}
+  #pbar{width:100%;height:10px;background:#2a3340;border-radius:5px;overflow:hidden;margin-bottom:1em;}
+  #pfill{height:100%;width:0;background:#1fa3ec;transition:width 10s linear;}
 </style>
-</head><body>
   <div class="contain">
     <div class="center_div">
 )";
 
 static const char APLIST_HTML_1[] PROGMEM = R"(
-      <h1 id='ttl'>Networks found:</h1>
+      <h1 id='ttl'>Scanning...</h1>
+      <div id='pbar'><div id='pfill'></div></div>
       <div id='vm'>
 )";
 
 static const char APLIST_HTML_2[] PROGMEM = R"(
       </div>
       <form method='get' action='wifisave'>
-        <button type='button' onclick='refresh();'>Rescan</button><br/><br/>
         <input id='s' name='s' length=32 placeholder='SSID (Leave blank for AP mode)'><br>
         <input id='p' name='p' length=32 placeholder='Password'><br>
         <br><button type='submit'>Save</button>
@@ -315,32 +333,30 @@ static const char APLIST_HTML_2[] PROGMEM = R"(
      </div>
   </div>
 <script>
+  // The device scans on the WebSocket request and pushes the list back. The
+  // progress bar approximates the scan time; results replace it when they arrive.
   function c(l){
     document.getElementById('s').value=l.innerText||l.textContent;
     document.getElementById('p').focus();
   }
-
+  function done(){ document.getElementById('pbar').style.display='none'; }
   var cn=new WebSocket('ws://'+location.hostname+':81/');
-  cn.onopen=function(){
-    cn.send('{"APLIST":""}');
-  }
+  cn.onopen=function(){ cn.send('{"APLIST":""}'); };
   cn.onmessage=function(e){
-    var data=JSON.parse(e.data);
-    if(data.hasOwnProperty('APLIST')){
-      rsp=data.APLIST.split('|');
-      document.getElementById('vm').innerHTML='';
-      for(var i=0;i<(rsp.length);i++){
-        document.getElementById('vm').innerHTML+='<span>'+(i+1)+": </span><a href='#p' onclick='c(this)'>" + rsp[i] + '</a><br>';
-      }
-      if(!document.getElementById('vm').innerHTML.replace(/\\s/g,'').length){
-        document.getElementById('ttl').innerHTML='No networks found.'
-      }
+    var data; try{ data=JSON.parse(e.data); }catch(_){ return; }
+    if(!data.hasOwnProperty('APLIST')){ return; }
+    done();
+    var list=data.APLIST.split('|').filter(function(s){return s.length>0;});
+    var vm=document.getElementById('vm');
+    if(!list.length){ document.getElementById('ttl').innerHTML='No networks found.'; vm.innerHTML=''; return; }
+    document.getElementById('ttl').innerHTML='Networks found:';
+    var html='';
+    for(var i=0;i<list.length;i++){
+      html+='<span>'+(i+1)+": </span><a href='#p' onclick='c(this)'>" + list[i] + '</a><br>';
     }
+    vm.innerHTML=html;
   };
-  function refresh(){
-    document.getElementById('vm').innerHTML='Please wait...'
-    cn.send('{"APLIST":""}');
-  }
+  setTimeout(function(){ document.getElementById('pfill').style.width='100%'; }, 50); // animate bar
 </script>
 )";
 
@@ -362,7 +378,7 @@ static const char REDIRECT_HTML[] PROGMEM = R"(
 </script>
 )";
 
-static const char API_HTML[] PROGMEM = R"(
+static const char API_HTML_0[] PROGMEM = R"(
 <style>
   h1{ font-size:1.6rem; margin:0 0 .2rem; text-align:center; }
   h2{ font-size:1rem; color:#cfd4de; margin:1.4rem 0 .6rem; }
@@ -373,10 +389,11 @@ static const char API_HTML[] PROGMEM = R"(
   code{ background:#1b212b; border:1px solid #232b37; border-radius:.3rem; padding:.05rem .35rem;
     font-size:.78rem; color:#ff9c85; white-space:nowrap; }
   .m{ color:#7ee29a; font-weight:600; }
-  .back{ display:inline-block; margin-bottom:1rem; }
 </style>
 <div class="contain"><div class="center_div">
-  <a class="back" href="/">&larr; Back</a>
+)";
+
+static const char API_HTML_1[] PROGMEM = R"(
   <h1>HTTP API</h1>
   <p class="sub">Device IP, port 80. Action endpoints return <code>OK</code> or <code>400</code>.</p>
   <table>
@@ -398,7 +415,7 @@ static const char API_HTML[] PROGMEM = R"(
   <h2>WebSocket (port 81)</h2>
   <table>
     <tr><th>Direction</th><th>Message</th><th>Description</th></tr>
-    <tr><td>send</td><td><code>{"APLIST":""}</code></td><td>Request the WiFi network list</td></tr>
+    <tr><td>send</td><td><code>{"APLIST":""}</code></td><td>Request a WiFi scan + network list</td></tr>
     <tr><td>send</td><td><code>{"GETDISP":""}</code></td><td>Request the current display name</td></tr>
     <tr><td>recv</td><td><code>{"TIME":"HH|MM|SS|DD.MM"}</code></td><td>Pushed once per second</td></tr>
     <tr><td>recv</td><td><code>{"DISP":"name"}</code></td><td>Pushed when the active display changes</td></tr>

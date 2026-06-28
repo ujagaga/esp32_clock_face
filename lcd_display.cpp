@@ -14,9 +14,8 @@ ST7789_Custom tft;
 
 #include <Fonts/FreeMonoBold9pt7b.h> 
 #include <Fonts/FreeMonoBold12pt7b.h> 
-#include <Fonts/FreeMonoBold18pt7b.h> 
-#include <Fonts/FreeMonoBold24pt7b.h> 
-#include <Fonts/TomThumb.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
 
 #include "lcd_display.h"
 
