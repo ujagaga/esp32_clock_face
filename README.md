@@ -27,7 +27,11 @@ only the transport-dependent fragments are switched by the flag.
 > `esp32-c6-websockets` contains the WebSocket version. <br>
 > On `main` the two are merged and selected with the `USE_WEBSOCKETS` flag above.<br>
 > `esp32-c6-tcp` branch implements a TCP API so you can use TCP as lightweight communication
-> layer and disable the HTTP server to lighten the CPU usage
+> layer and disable the HTTP server to lighten the CPU usage.<br>
+> `esp32-c6-no-sd` branch drops the microSD card entirely: images are single-colour
+> **1-bit** frames (drawn in the current LED colour) stored in on-chip flash
+> (LittleFS) and uploaded from the browser, so no SD card or RGB565 conversion is
+> needed.
 
 ## Hardware
 
