@@ -201,7 +201,7 @@ filesystem holds ~150 of them.
 Upload from the web page: click **Upload images**, pick one or more files, and
 the browser scales/crops each to 320x172, thresholds it to 1-bpp and stores it
 in flash (extension forced to `.1bpp`). They appear in the gallery and in
-`/api/imagelist`. Delete one with its ✕ overlay.
+`/api/imagelist`. Delete one with its X overlay button.
 
 The LED colour doubles as the image colour — set it from the web page or
 `/api/setled`. If the LED is off (black), images fall back to white so they stay
