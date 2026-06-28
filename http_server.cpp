@@ -12,6 +12,7 @@
 #include "gpio.h"
 #include "lcd_display.h"
 #include "sd_images.h"
+#include "NTPSync.h"
 #include "http_ui.h"
 
 // --- Web server object ---
@@ -21,6 +22,8 @@ WebServer* webServer = nullptr;
 void showStartPage() { 
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(INDEX_HTML_0);
+  response += FPSTR(NAV_HTML);
+  response += "<h1>WiFi Clock</h1>";
   response += "<p class='ip'>Station IP: " + WIFIC_getStationIp() + "</p>";
   response += FPSTR(INDEX_HTML_1);
   response += FPSTR(HTML_END);
@@ -30,7 +33,9 @@ void showStartPage() {
 
 static void showApiPage(void){
   String response = FPSTR(HTML_BEGIN);
-  response += FPSTR(API_HTML);
+  response += FPSTR(API_HTML_0);
+  response += FPSTR(NAV_HTML);
+  response += FPSTR(API_HTML_1);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);
 }
@@ -50,14 +55,15 @@ static void showStatusPage(bool goToHome = false) {
   webServer->send(200, "text/html", response);   
 }
 
-static void selectAP(void) {   
+static void selectAP(void) {
+  WIFIC_startScan();   // kick off the scan; JS fetches /aplist ~10 s later
   String response = FPSTR(HTML_BEGIN);
-  response += FPSTR(APLIST_HTML_0);  
+  response += FPSTR(APLIST_HTML_0);
+  response += FPSTR(NAV_HTML);
   response += FPSTR(APLIST_HTML_1);
-  response += "Please wait...";  
-  response += FPSTR(APLIST_HTML_2);   
+  response += FPSTR(APLIST_HTML_2);
   response += FPSTR(HTML_END);
-  webServer->send(200, "text/html", response);  
+  webServer->send(200, "text/html", response);
 }
 
 static void saveWiFi(void){
@@ -199,6 +205,21 @@ static void apList(void){
   webServer->send(200, "text/plain", WIFIC_getApList());
 }
 
+static void getDisplay(void){
+  webServer->send(200, "text/plain", MAIN_getDisplay());
+}
+
+// "HH|MM|SS|DD.MM" from NTP, or "" if not synced yet.
+static void getTime(void){
+  if(!NTPS_hasSynced()){
+    webServer->send(200, "text/plain", "");
+    return;
+  }
+  String r = NTPS_getHH() + "|" + NTPS_getMM() + "|" +
+             String(NTPS_getSeconds()) + "|" + NTPS_getDate();
+  webServer->send(200, "text/plain", r);
+}
+
 // --- Public functions ---
 void HTTP_SERVER_process(void){
   webServer->handleClient(); 
@@ -225,6 +246,8 @@ void HTTP_SERVER_init(void){
   webServer->on("/upload", HTTP_POST, uploadDone, uploadImage);
   webServer->on("/delete", HTTP_GET, deleteImage);
   webServer->on("/aplist", HTTP_GET, apList);
+  webServer->on("/getdisplay", HTTP_GET, getDisplay);
+  webServer->on("/gettime", HTTP_GET, getTime);
   webServer->onNotFound(showStartPage);
   
   webServer->begin();

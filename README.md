@@ -5,12 +5,12 @@ the time on the built-in LCD, or a still image loaded from a microSD card. The
 onboard RGB LED, screen brightness, orientation and display mode are all
 controllable from a built-in web page and a matching HTTP API.
 
-The web page shows a dark-themed gallery: a live clock tile plus a thumbnail of
-every image on the SD card, rendered in the browser. Tap a thumbnail to display
-it on the LCD (selected item is highlighted), delete one with the ✕ overlay, or
+The web page shows a dark-themed gallery: a clock tile plus a thumbnail of every
+image on the SD card, rendered in the browser. Tap a thumbnail to display it on
+the LCD (the active item is highlighted), delete one with the ✕ overlay, or
 upload a new image straight from the browser — it is resized, cropped and
-converted to RGB565 client-side, then streamed to the card. Time and the active
-display are pushed to the page over a WebSocket (no polling).
+converted to RGB565 client-side, then streamed to the card. The page reads its
+state (time, active display) once on load; **reload to refresh** it.
 
 ## Hardware
 
@@ -54,11 +54,9 @@ library's transactions do), the LCD's SPI config is re-latched via a
 |---|---|
 | Adafruit GFX Library | graphics primitives / fonts (the custom LCD driver extends it) |
 | Adafruit BusIO | dependency of Adafruit GFX |
-| ArduinoJson | WebSocket messages |
 | NTPClient | NTP time |
 | Time | time keeping (dependency of Timezone) |
 | Timezone | local time / DST |
-| WebSockets (by Markus Sattler) | WebSocket (WiFi scan, time + active-display push) |
 | Adafruit ST7789 | *optional* — only if you enable `USE_ADAFRUIT_ST7789` in `config.h` |
 
 Bundled with the ESP32 core (no install needed): `WiFi`, `WebServer`, `SD`,
@@ -125,14 +123,15 @@ endpoints return a `|`-separated string.
 | `GET /getimage?name=NAME` | Raw RGB565 bytes of an image (used by the gallery) | `/getimage?name=eyes1.bin` |
 | `POST /upload` | Upload an image (multipart, raw RGB565 `.bin`, must be 320x172) | |
 | `GET /delete?name=NAME` | Delete an image from the SD card | `/delete?name=eyes1.bin` |
-| `GET /aplist` | Scan and list nearby WiFi networks (blocking scan) | `Home\|Office` |
+| `GET /getdisplay` | Active display name (`clock` or an image) | `eyes1.bin` |
+| `GET /gettime` | Current time `HH\|MM\|SS\|DD.MM` (empty until NTP-synced) | `14\|05\|23\|28.06` |
+| `GET /aplist` | Result of the last WiFi scan (empty until ready) | `Home\|Office` |
 | `GET /wifisave?s=SSID&p=PASS` | Save WiFi credentials and switch to station mode | `/wifisave?s=Home&p=secret` |
 | `GET /` | Main web page | |
-| `GET /selectap` | WiFi configuration page | |
+| `GET /selectap` | WiFi configuration page (starts an async scan on load) | |
 
-The WebSocket server (port 81) carries: `{"APLIST":""}` → network list,
-`{"GETDISP":""}` → current display name, and server-pushed `{"TIME":"HH|MM|SS|DD.MM"}`
-(once per second) and `{"DISP":"name"}` (on change).
+WiFi scanning is non-blocking: serving `/selectap` kicks off a scan, and the page
+fetches `/aplist` ~10 s later to populate the list (with a couple of retries).
 
 Example:
 

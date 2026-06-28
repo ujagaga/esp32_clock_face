@@ -184,15 +184,23 @@ void WIFIC_process(void) {
 // -----------------------------------------------------------------------------
 // Return list of scanned APs
 // -----------------------------------------------------------------------------
+// Kick off a non-blocking scan; results are read later via WIFIC_getApList().
+void WIFIC_startScan(void) {
+    WiFi.scanDelete();
+    WiFi.scanNetworks(true);             // async
+}
+
+// Return the completed scan as a '|'-joined list, or "" if it is still running.
 String WIFIC_getApList(void) {
-    String result = "";
-    int n = WiFi.scanNetworks();
-    if (n > 0) {
-        result = WiFi.SSID(0);
-        for (int i = 1; i < n; ++i) {
-            result += "|" + WiFi.SSID(i);
-        }
+    int n = WiFi.scanComplete();
+    if (n <= 0) {                        // -1 running, -2 failed, 0 none
+        return "";
     }
+    String result = WiFi.SSID(0);
+    for (int i = 1; i < n; ++i) {
+        result += "|" + WiFi.SSID(i);
+    }
+    WiFi.scanDelete();                   // free the result buffer
     return result;
 }
 
