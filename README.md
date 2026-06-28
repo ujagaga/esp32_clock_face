@@ -22,9 +22,12 @@ connection and per-second pushes, plus two extra libraries
 features. Both modes live in `http_ui.h` and share all the same page styling;
 only the transport-dependent fragments are switched by the flag.
 
-> **Branch note:** `esp32-c6-no-ws` archives the original no-WebSocket code,
-> and `esp32-c6-websockets` archives the WebSocket version. On `main` the two
-> are merged and selected with the `USE_WEBSOCKETS` flag above.
+> **Branch note:**<br>
+> `esp32-c6-no-ws` contains the original no-WebSocket code,<br>
+> `esp32-c6-websockets` contains the WebSocket version. <br>
+> On `main` the two are merged and selected with the `USE_WEBSOCKETS` flag above.<br>
+> `esp32-c6-tcp` branch implements a TCP API so you can use TCP as lightweight communication
+> layer and disable the HTTP server to lighten the CPU usage
 
 ## Hardware
 
