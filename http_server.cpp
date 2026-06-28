@@ -21,27 +21,7 @@ WebServer* webServer = nullptr;
 void showStartPage() { 
   String response = FPSTR(HTML_BEGIN);
   response += FPSTR(INDEX_HTML_0);
-  response += "<p>Station IP: " + WIFIC_getStationIp() + "</p>";
-
-  // Display selector: clock or one of the SD card images.
-  response += "<label for='disp'>Display: </label>";
-  response += "<select id='disp' onchange=\"onSel(this.value);\">";
-  response += "<option value='clock'>Clock</option>";
-  String imgList = SDIMG_list();
-  int start = 0;
-  while(start < imgList.length()){
-    int sep = imgList.indexOf('|', start);
-    if(sep < 0){
-      sep = imgList.length();
-    }
-    String name = imgList.substring(start, sep);
-    if(name.length() > 0){
-      response += "<option value='" + name + "'>" + name + "</option>";
-    }
-    start = sep + 1;
-  }
-  response += "</select>";
-
+  response += "<p class='ip'>Station IP: " + WIFIC_getStationIp() + "</p>";
   response += FPSTR(INDEX_HTML_1);
   response += FPSTR(HTML_END);
   webServer->send(200, "text/html", response);  

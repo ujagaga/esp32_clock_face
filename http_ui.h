@@ -15,9 +15,10 @@ static const char HTML_BEGIN[] PROGMEM = R"(
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>WiFi Clock</title>
     <style>
-      body { background-color: white; font-family: Arial, Helvetica, Sans-Serif; color: #000000; }
-      .contain{width: 100%;}
-      .center_div{margin:0 auto; max-width: 400px;position:relative;}
+      body { background:#11151c; color:#e6e9ef; font-family: system-ui, Arial, Helvetica, sans-serif; margin:0; }
+      a{ color:#ff7a5c; }
+      .contain{ width:100%; }
+      .center_div{ margin:0 auto; width:92%; max-width:800px; position:relative; padding:1.2rem 0 4.5rem; }
     </style>
   </head>
   <body>
@@ -27,51 +28,70 @@ static const char HTML_END[] PROGMEM = "</body></html>";
 
 static const char INDEX_HTML_0[] PROGMEM = R"(
 <style>
-  .btn_cfg{border:0;border-radius:0.3rem;color:#fff;line-height:1.4rem;font-size:0.8rem;margin:1ch;height:2rem;width:10rem;background-color:#ff3300;}
-</style>
-<style>
-  #status{position:sticky;top:0;z-index:10;min-height:1.4rem;padding:0.4rem;margin-bottom:0.5rem;
-    border-radius:0.3rem;font-size:0.85rem;display:none;text-align:left;}
-  #status.ok{display:block;background:#d4edda;color:#155724;}
-  #status.err{display:block;background:#f8d7da;color:#721c24;}
-  #status.info{display:block;background:#e2e3e5;color:#383d41;}
+  h1{ font-weight:600; font-size:1.7rem; letter-spacing:.5px; margin:0 0 .2rem; text-align:center; }
+  .ip{ color:#8b93a3; font-size:.8rem; text-align:center; margin:0 0 1.2rem; }
+  .card{ background:#1b212b; border:1px solid #232b37; border-radius:.9rem; padding:1.1rem; margin-bottom:1.1rem; }
+  .row{ display:flex; align-items:center; gap:.8rem; margin:.5rem 0; }
+  .row label{ flex:0 0 6.5rem; color:#cfd4de; font-size:.9rem; }
+  input[type=range]{ flex:1; accent-color:#ff5a3c; }
+  input[type=color]{ border:0; background:none; width:2.6rem; height:2rem; padding:0; cursor:pointer; }
+  .btn-row{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.6rem; }
+  .btn{ border:0; border-radius:.55rem; color:#fff; background:#2a3340; font-size:.85rem;
+    padding:.6rem 1rem; cursor:pointer; transition:background .15s; }
+  .btn:hover{ background:#37424f; }
+  .btn.accent{ background:#ff5a3c; }
+  .btn.accent:hover{ background:#ff6f55; }
+  .ghead{ margin:0 0 .8rem; font-size:.95rem; color:#cfd4de; }
+  .src{ text-align:center; font-size:.8rem; margin:.5rem 0 0; }
+  #status{ position:fixed; left:50%; transform:translateX(-50%); bottom:1rem; z-index:50; max-width:90%;
+    padding:.65rem 1.1rem; border-radius:.6rem; font-size:.85rem; display:none;
+    box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  #status.ok{ display:block; background:#16361f; color:#7ee29a; border:1px solid #2f6b41; }
+  #status.err{ display:block; background:#3a1a1d; color:#ff8b8b; border:1px solid #7a2d33; }
+  #status.info{ display:block; background:#1e2733; color:#9db4d0; border:1px solid #33485f; }
 </style>
 <div class="contain">
   <div class="center_div">
-  <div id="status"></div>
   <h1>WiFi Clock</h1>
 )";
 
 static const char INDEX_HTML_1[] PROGMEM = R"(
-  <br>
-  <label for="led">LED color: </label>
-  <input type="color" id="led" value="#000000" oninput="setLed(this.value);">
-  <br/><br/>
-  <label for="bl">Brightness: </label>
-  <input type="range" id="bl" min="0" max="100" value="100" oninput="setBl(this.value);">
-  <br/><br/>
-  <button class="btn_cfg" type="button" onclick="fetch('/flashbl');">Flash</button>
-  <br/>
-  <button class="btn_cfg" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
-  <br/>
-  <button class="btn_cfg" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
-  <br/>
-  <hr>
-  <label for="up">Upload image: </label>
-  <input type="file" id="up" accept="image/*" onchange="uploadFile(this.files[0]);">
-  <hr>
-  <p>Gallery (click to display):</p>
-  <div id="gal"></div>
-  <hr>
-  <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a>
+  <div class="card">
+    <div class="row">
+      <label for="led">LED color</label>
+      <input type="color" id="led" value="#000000" oninput="setLed(this.value);">
+    </div>
+    <div class="row">
+      <label for="bl">Brightness</label>
+      <input type="range" id="bl" min="0" max="100" value="100" oninput="setBl(this.value);">
+    </div>
+    <div class="btn-row">
+      <button class="btn" type="button" onclick="fetch('/flashbl');">Flash</button>
+      <button class="btn" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
+      <button class="btn" type="button" onclick="location.href='/selectap';">Configure WiFi</button>
+      <label class="btn accent" for="up">Upload image</label>
+      <input type="file" id="up" accept="image/*" style="display:none" onchange="uploadFile(this.files[0]);">
+    </div>
+  </div>
+  <div class="card">
+    <p class="ghead">Gallery &mdash; tap to display</p>
+    <div id="gal"></div>
+  </div>
+  <p class="src"><a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a></p>
 </div>
+<div id="status"></div>
 <style>
-  #gal{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
-  #gal figure{margin:0;text-align:center;}
-  #gal canvas{width:160px;height:auto;border:2px solid #ccc;border-radius:4px;display:block;cursor:pointer;}
-  #gal figure.sel canvas{border-color:#ff3300;}
-  #gal figcaption{font-size:0.7rem;word-break:break-all;width:160px;}
-  #gal button.del{border:0;border-radius:0.3rem;color:#fff;background:#ff3300;font-size:0.7rem;margin-top:0.3rem;padding:0.2rem 0.6rem;cursor:pointer;}
+  #gal{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.9rem; }
+  #gal figure{ margin:0; position:relative; text-align:center; }
+  #gal canvas{ box-sizing:border-box; width:100%; height:auto; border:2px solid #2a3340;
+    border-radius:.6rem; display:block; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+  #gal canvas:hover{ border-color:#4a5666; }
+  #gal figure.sel canvas{ border:4px solid #ff5a3c; box-shadow:0 0 16px rgba(255,90,60,.55); }
+  #gal figcaption{ font-size:.72rem; color:#8b93a3; margin-top:.35rem; word-break:break-all; }
+  #gal .del{ position:absolute; top:-11px; right:-11px; width:24px; height:24px; padding:0;
+    border:2px solid #ff5a3c; border-radius:50%; background:#1b212b; color:#ff5a3c; font-size:14px;
+    line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s; }
+  #gal .del:hover{ background:#ff5a3c; color:#fff; }
 </style>
 <script>
   var PV_W=320, PV_H=172;
@@ -87,7 +107,6 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       figs[i].className = (figs[i].dataset.name===name) ? 'sel' : '';
     }
   }
-  function onSel(v){ fetch('/setdisplay?img=' + encodeURIComponent(v)); markSel(v); }
   function deleteImg(name){
     if(!confirm('Delete ' + name + '?')){ return; }
     fetch('/delete?name=' + encodeURIComponent(name)).then(function(r){
@@ -132,8 +151,9 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       var cap=document.createElement('figcaption');
       cap.textContent=name;
       var del=document.createElement('button');
-      del.textContent='Delete';
+      del.textContent='X';   
       del.className='del';
+      del.title='Delete';
       del.onclick=function(){ deleteImg(name); };
       fig.appendChild(cv); fig.appendChild(cap); fig.appendChild(del);
       document.getElementById('gal').appendChild(fig);
@@ -175,8 +195,6 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
         else{ drawClock(p[0], p[1], parseInt(p[2],10), p[3]); }
       }
       if(d.hasOwnProperty('DISP')){
-        var sel=document.getElementById('disp');
-        if(sel && sel.value!==d.DISP){ sel.value=d.DISP; }
         markSel(d.DISP);
       }
     };
