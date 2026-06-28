@@ -99,6 +99,7 @@ void loop(void){
   WS_process();
   GPIO_process();
   LCD_process();
+  WIFIC_process();
   if(WIFIC_stationConnected()){
     NTPS_process();
   }

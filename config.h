@@ -13,6 +13,11 @@
 #define AP_NAME_PREFIX          "LcdClk_"         // Will be appended by device MAC
 #define AP_PASS                 "pass1234"
 
+// Once the station is connected, turn the AP off this long after the last AP
+// client disconnects (saves power by dropping to station-only mode). The AP is
+// brought back automatically if the station connection is later lost.
+#define AP_AUTO_OFF_MS          (120000)
+
 #define WIFI_PASS_EEPROM_ADDR   (0)
 #define WIFI_PASS_SIZE          (32)
 #define SSID_EEPROM_ADDR        (WIFI_PASS_EEPROM_ADDR + WIFI_PASS_SIZE)

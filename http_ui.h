@@ -77,7 +77,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     <p class="ghead">Gallery &mdash; tap to display</p>
     <div id="gal"></div>
   </div>
-  <p class="src"><a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a></p>
+  <p class="src"><a href='/api'>API docs</a> &middot; <a href='https://github.com/ujagaga/esp32_clock_face' target="_blank" rel="noopener noreferrer">Source code</a></p>
 </div>
 <div id="status"></div>
 <style>
@@ -360,6 +360,50 @@ static const char REDIRECT_HTML[] PROGMEM = R"(
   }
   count();
 </script>
+)";
+
+static const char API_HTML[] PROGMEM = R"(
+<style>
+  h1{ font-size:1.6rem; margin:0 0 .2rem; text-align:center; }
+  h2{ font-size:1rem; color:#cfd4de; margin:1.4rem 0 .6rem; }
+  .sub{ color:#8b93a3; font-size:.8rem; text-align:center; margin:0 0 1.2rem; }
+  table{ width:100%; border-collapse:collapse; font-size:.82rem; }
+  th,td{ text-align:left; padding:.5rem .6rem; border-bottom:1px solid #232b37; vertical-align:top; }
+  th{ color:#8b93a3; font-weight:600; }
+  code{ background:#1b212b; border:1px solid #232b37; border-radius:.3rem; padding:.05rem .35rem;
+    font-size:.78rem; color:#ff9c85; white-space:nowrap; }
+  .m{ color:#7ee29a; font-weight:600; }
+  .back{ display:inline-block; margin-bottom:1rem; }
+</style>
+<div class="contain"><div class="center_div">
+  <a class="back" href="/">&larr; Back</a>
+  <h1>HTTP API</h1>
+  <p class="sub">Device IP, port 80. Action endpoints return <code>OK</code> or <code>400</code>.</p>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr><td class="m">GET</td><td><code>/setled?c=RRGGBB</code></td><td>Set RGB LED color (6 hex digits)</td></tr>
+    <tr><td class="m">GET</td><td><code>/setbl?v=N</code></td><td>Backlight brightness, N = 0..100 (0..50% duty)</td></tr>
+    <tr><td class="m">GET</td><td><code>/flashbl</code></td><td>Flash backlight to 100% for 500 ms</td></tr>
+    <tr><td class="m">GET</td><td><code>/flipscreen</code></td><td>Rotate the screen 180&deg;</td></tr>
+    <tr><td class="m">GET</td><td><code>/setdisplay?img=NAME</code></td><td>Show SD image NAME, or <code>clock</code></td></tr>
+    <tr><td class="m">GET</td><td><code>/imagelist</code></td><td>List *.bin images (| separated)</td></tr>
+    <tr><td class="m">GET</td><td><code>/getimage?name=NAME</code></td><td>Raw RGB565 bytes of an image</td></tr>
+    <tr><td class="m">POST</td><td><code>/upload</code></td><td>Upload image (multipart, RGB565, 320x172)</td></tr>
+    <tr><td class="m">GET</td><td><code>/delete?name=NAME</code></td><td>Delete an image from the SD card</td></tr>
+    <tr><td class="m">GET</td><td><code>/aplist</code></td><td>Scan and list nearby WiFi networks</td></tr>
+    <tr><td class="m">GET</td><td><code>/wifisave?s=SSID&amp;p=PASS</code></td><td>Save WiFi credentials, switch to station mode</td></tr>
+    <tr><td class="m">GET</td><td><code>/</code></td><td>Main web page</td></tr>
+    <tr><td class="m">GET</td><td><code>/selectap</code></td><td>WiFi configuration page</td></tr>
+  </table>
+  <h2>WebSocket (port 81)</h2>
+  <table>
+    <tr><th>Direction</th><th>Message</th><th>Description</th></tr>
+    <tr><td>send</td><td><code>{"APLIST":""}</code></td><td>Request the WiFi network list</td></tr>
+    <tr><td>send</td><td><code>{"GETDISP":""}</code></td><td>Request the current display name</td></tr>
+    <tr><td>recv</td><td><code>{"TIME":"HH|MM|SS|DD.MM"}</code></td><td>Pushed once per second</td></tr>
+    <tr><td>recv</td><td><code>{"DISP":"name"}</code></td><td>Pushed when the active display changes</td></tr>
+  </table>
+</div></div>
 )";
 
 #endif

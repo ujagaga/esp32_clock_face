@@ -28,6 +28,13 @@ void showStartPage() {
 }
 
 
+static void showApiPage(void){
+  String response = FPSTR(HTML_BEGIN);
+  response += FPSTR(API_HTML);
+  response += FPSTR(HTML_END);
+  webServer->send(200, "text/html", response);
+}
+
 static void showNotFound(void){
   webServer->send(404, "text/html; charset=iso-8859-1","<html><head> <title>404 Not Found</title></head><body><h1>Not Found</h1></body></html>"); 
 }
@@ -206,6 +213,7 @@ void HTTP_SERVER_init(void){
   webServer->on("/", HTTP_GET, showStartPage);
   webServer->on("/favicon.ico", HTTP_GET, showNotFound);
   webServer->on("/selectap", HTTP_GET, selectAP);
+  webServer->on("/api", HTTP_GET, showApiPage);
   webServer->on("/wifisave", HTTP_GET, saveWiFi);
   webServer->on("/setled", HTTP_GET, setLed);
   webServer->on("/flipscreen", HTTP_GET, flipScreen);

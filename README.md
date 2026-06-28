@@ -36,6 +36,11 @@ library's transactions do), the LCD's SPI config is re-latched via a
 - Flip the screen 180 degrees from the web page ("Flip Screen").
 - Backlight is capped at 50% duty by default (the panel docs warn against
   sustained full brightness); the "Flash" function briefly overrides this.
+- Once connected to your WiFi, the device's own AP is switched off to save
+  power after 120 s with no AP clients (configurable via `AP_AUTO_OFF_MS` in
+  `config.h`), dropping to station-only mode. The timer restarts whenever an AP
+  client is connected, and the AP is brought back automatically if the station
+  connection is later lost, so the device never becomes unreachable.
 
 ## Software requirements
 

@@ -23,6 +23,8 @@ static char st_pass[WIFI_PASS_SIZE] = {0}; // Saved password
 static IPAddress stationIP;
 static IPAddress apIP(192, 168, 4, 1);
 static bool stationConnectedOnce = false; // mark first successful STA connect
+static unsigned long apIdleSince = 0;     // millis the AP last had zero clients
+static bool apDisabled = false;           // AP turned off to save power
 
 // -----------------------------------------------------------------------------
 // Getters
@@ -110,13 +112,20 @@ void WIFIC_setupCallbacks(void) {
         stationIP = WiFi.localIP();
         Serial.printf("\n\nConnected, IP: %s\n", stationIP.toString().c_str());
 
-        if (!stationConnectedOnce) {
-            stationConnectedOnce = true;
-        }
+        stationConnectedOnce = true;
+        apIdleSince = millis();          // start the AP power-down countdown
+
+        // If the AP was powered down earlier, the station must have dropped and
+        // recovered; AP is re-enabled by the disconnect handler, nothing to do.
     }, ARDUINO_EVENT_WIFI_STA_GOT_IP);
 
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
         Serial.println("STA disconnected, will auto-reconnect.");
+        if (apDisabled) {
+            Serial.println("Re-enabling AP (station lost).");
+            APMode();                    // bring the AP back so the device stays reachable
+            apDisabled = false;
+        }
     }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 }
 
@@ -148,6 +157,28 @@ void WIFIC_init(void) {
     APMode();
     WIFIC_setupCallbacks();
     WIFIC_stationMode();
+}
+
+// -----------------------------------------------------------------------------
+// Periodic processing: drop the AP once the station is up and no AP clients
+// have been connected for AP_AUTO_OFF_MS (saves power in station-only mode).
+// -----------------------------------------------------------------------------
+void WIFIC_process(void) {
+    if (apDisabled || !stationConnectedOnce || WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    if (WiFi.softAPgetStationNum() > 0) {
+        apIdleSince = millis();          // clients present, keep the AP up
+        return;
+    }
+
+    if ((millis() - apIdleSince) > AP_AUTO_OFF_MS) {
+        Serial.println("No AP clients; disabling AP to save power.");
+        WiFi.softAPdisconnect(true);
+        WiFi.mode(WIFI_STA);
+        apDisabled = true;
+    }
 }
 
 // -----------------------------------------------------------------------------
