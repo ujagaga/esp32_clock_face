@@ -97,7 +97,10 @@ void loop(void){
   GPIO_process();
   LCD_process();
   WIFIC_process();
-  if(WIFIC_stationConnected()){
+  // Only sync NTP while the clock is shown. Timekeeping continues regardless
+  // (NTPClient advances from millis between syncs); we just skip the network
+  // poll when an image is displayed and the clock isn't visible.
+  if(WIFIC_stationConnected() && !showImage){
     NTPS_process();
   }
 

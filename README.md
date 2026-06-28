@@ -12,6 +12,13 @@ upload a new image straight from the browser — it is resized, cropped and
 converted to RGB565 client-side, then streamed to the card. The page reads its
 state (time, active display) once on load; **reload to refresh** it.
 
+> **Branch note:** the `esp32-c6-websockets` branch implements the same features
+> over a WebSocket instead — the clock and active display update live in the
+> browser (no reload), giving a nicer UI. The trade-off is higher CPU usage from
+> the persistent connection and per-second pushes, which may leave less headroom
+> for additional features. This `main` branch uses simple load-time fetches and
+> is the lighter-weight option.
+
 ## Hardware
 
 **Board:** [Waveshare ESP32-C6-LCD-1.47](https://docs.waveshare.com/ESP32-C6-LCD-1.47)
