@@ -83,8 +83,8 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       <input type="range" id="bl" min="0" max="100" value="100" oninput="setBl(this.value);">
     </div>
     <div class="btn-row">
-      <button class="btn" type="button" onclick="fetch('/flashbl');">Flash</button>
-      <button class="btn" type="button" onclick="fetch('/flipscreen');">Flip Screen</button>
+      <button class="btn" type="button" onclick="fetch('/api/flashbl');">Flash</button>
+      <button class="btn" type="button" onclick="fetch('/api/flipscreen');">Flip Screen</button>
       <label class="btn accent" for="up">Upload images</label>
       <input type="file" id="up" accept="image/*" multiple style="display:none" onchange="uploadFiles(this.files);">
     </div>
@@ -116,7 +116,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     s.textContent=msg;
     s.className=kind||'info';
   }
-  function selectImg(name){ fetch('/setdisplay?img=' + encodeURIComponent(name)); markSel(name); }
+  function selectImg(name){ fetch('/api/setdisplay?img=' + encodeURIComponent(name)); markSel(name); }
   function markSel(name){
     var figs=document.querySelectorAll('#gal figure');
     for(var i=0;i<figs.length;i++){
@@ -167,7 +167,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
       var cap=document.createElement('figcaption');
       cap.textContent=name;
       var del=document.createElement('button');
-      del.textContent='×';
+      del.textContent='x';
       del.className='del';
       del.title='Delete';
       del.onclick=function(){ deleteImg(name); };
@@ -231,7 +231,7 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
   }
   function buildGallery(){
     addClockTile();
-    fetch('/imagelist').then(function(r){return r.text();}).then(function(t){
+    fetch('/api/imagelist').then(function(r){return r.text();}).then(function(t){
       var names=t.split('|').filter(function(s){return s.length>0;});
       loadOne(names, 0);
     });
@@ -293,8 +293,8 @@ static const char INDEX_HTML_1[] PROGMEM = R"(
     }
     next();
   }
-  function setLed(v){ fetch('/setled?c=' + v.substring(1)); }
-  function setBl(v){ fetch('/setbl?v=' + v); }
+  function setLed(v){ fetch('/api/setled?c=' + v.substring(1)); }
+  function setBl(v){ fetch('/api/setbl?v=' + v); }
   buildGallery();
   startSocket();   // device pushes time + active display over WebSocket
 </script>
@@ -396,14 +396,23 @@ static const char API_HTML_0[] PROGMEM = R"(
 static const char API_HTML_1[] PROGMEM = R"(
   <h1>HTTP API</h1>
   <p class="sub">Device IP, port 80. Action endpoints return <code>OK</code> or <code>400</code>.</p>
+
+  <h2>Automation API</h2>
+  <p class="sub">Stable <code>/api/*</code> endpoints for scripts and home automation.</p>
   <table>
     <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
-    <tr><td class="m">GET</td><td><code>/setled?c=RRGGBB</code></td><td>Set RGB LED color (6 hex digits)</td></tr>
-    <tr><td class="m">GET</td><td><code>/setbl?v=N</code></td><td>Backlight brightness, N = 0..100 (0..50% duty)</td></tr>
-    <tr><td class="m">GET</td><td><code>/flashbl</code></td><td>Flash backlight to 100% for 500 ms</td></tr>
-    <tr><td class="m">GET</td><td><code>/flipscreen</code></td><td>Rotate the screen 180&deg;</td></tr>
-    <tr><td class="m">GET</td><td><code>/setdisplay?img=NAME</code></td><td>Show SD image NAME, or <code>clock</code></td></tr>
-    <tr><td class="m">GET</td><td><code>/imagelist</code></td><td>List *.bin images (| separated)</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/setled?c=RRGGBB</code></td><td>Set RGB LED color (6 hex digits)</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/setbl?v=N</code></td><td>Backlight brightness, N = 0..100 (0..50% duty)</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/flashbl</code></td><td>Flash backlight to 100% for 500 ms</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/flipscreen</code></td><td>Rotate the screen 180&deg;</td></tr>
+    <tr><td class="m">GET</td><td><code>/api/setdisplay?img=NAME</code></td><td>Show SD image NAME, or <code>clock</code></td></tr>
+    <tr><td class="m">GET</td><td><code>/api/imagelist</code></td><td>List *.bin images (| separated)</td></tr>
+  </table>
+
+  <h2>Web UI &amp; config</h2>
+  <p class="sub">Used by the built-in web pages; not part of the automation surface.</p>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
     <tr><td class="m">GET</td><td><code>/getimage?name=NAME</code></td><td>Raw RGB565 bytes of an image</td></tr>
     <tr><td class="m">POST</td><td><code>/upload</code></td><td>Upload image (multipart, RGB565, 320x172)</td></tr>
     <tr><td class="m">GET</td><td><code>/delete?name=NAME</code></td><td>Delete an image from the SD card</td></tr>
@@ -412,6 +421,7 @@ static const char API_HTML_1[] PROGMEM = R"(
     <tr><td class="m">GET</td><td><code>/</code></td><td>Main web page</td></tr>
     <tr><td class="m">GET</td><td><code>/selectap</code></td><td>WiFi configuration page</td></tr>
   </table>
+
   <h2>WebSocket (port 81)</h2>
   <table>
     <tr><th>Direction</th><th>Message</th><th>Description</th></tr>

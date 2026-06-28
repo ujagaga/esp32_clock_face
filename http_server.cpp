@@ -219,12 +219,12 @@ void HTTP_SERVER_init(void){
   webServer->on("/selectap", HTTP_GET, selectAP);
   webServer->on("/api", HTTP_GET, showApiPage);
   webServer->on("/wifisave", HTTP_GET, saveWiFi);
-  webServer->on("/setled", HTTP_GET, setLed);
-  webServer->on("/flipscreen", HTTP_GET, flipScreen);
-  webServer->on("/setdisplay", HTTP_GET, setDisplay);
-  webServer->on("/setbl", HTTP_GET, setBacklight);
-  webServer->on("/flashbl", HTTP_GET, flashBacklight);
-  webServer->on("/imagelist", HTTP_GET, imageList);
+  webServer->on("/api/setled", HTTP_GET, setLed);
+  webServer->on("/api/flipscreen", HTTP_GET, flipScreen);
+  webServer->on("/api/setdisplay", HTTP_GET, setDisplay);
+  webServer->on("/api/setbl", HTTP_GET, setBacklight);
+  webServer->on("/api/flashbl", HTTP_GET, flashBacklight);
+  webServer->on("/api/imagelist", HTTP_GET, imageList);
   webServer->on("/getimage", HTTP_GET, getImage);
   webServer->on("/upload", HTTP_POST, uploadDone, uploadImage);
   webServer->on("/delete", HTTP_GET, deleteImage);
